@@ -296,7 +296,26 @@ function buildTornadoAndScenariosPage(sr: SensitivityAnalysisResult, totalPages:
 
   const mostSensitive = variables[0];
   const leastSensitive = variables[variables.length - 1];
-  const cushion = mostSensitive?.breakEvenPct;
+  const testedRange = Math.max(1, rangeMax - rangeMin);
+  const cleanName = (name: string) => name.replace(/\s*\([^)]*\)/g, "");
+  const perPointImpact = (v: VariableSensitivity) => v.impact / testedRange;
+  const adversePoint = mostSensitive
+    ? [...mostSensitive.points]
+        .filter(point => mostSensitive.variable === "cashFlows" ? point.pct <= 0 : point.pct >= 0)
+        .sort((a, b) => {
+          const target = mostSensitive.variable === "cashFlows"
+            ? -scenarios[0].adjustmentPct
+            : scenarios[0].adjustmentPct;
+          return Math.abs(a.pct - target) - Math.abs(b.pct - target);
+        })[0]
+    : undefined;
+  const adverseDirection = mostSensitive?.variable === "cashFlows" ? "baisse" : "hausse";
+  const thresholdText = mostSensitive?.breakEvenPct !== null && mostSensitive?.breakEvenPct !== undefined
+    ? `La viabilité est remise en cause après une ${mostSensitive.variable === "cashFlows" ? "baisse" : "hausse"} de ${f(Math.abs(mostSensitive.breakEvenPct), 1)}% de cette variable.`
+    : "Aucun seuil de viabilité n'apparaît dans la plage testée.";
+  const impactText = variables
+    .map(v => `${cleanName(v.nameFr)} : ${fDA(perPointImpact(v))} par point de pourcentage`)
+    .join(" ; ");
 
   const content = `
     ${sectionTitle("Diagramme Tornade — Impact sur la VAN", "مخطط الإعصار — التأثير على NPV")}
@@ -312,9 +331,9 @@ function buildTornadoAndScenariosPage(sr: SensitivityAnalysisResult, totalPages:
     </div>
 
     <div style="margin-top:16px;background:${C.primaryLight};border-radius:8px;padding:12px 14px;font-size:10.5px;line-height:1.65;">
-      <strong>🔍 Variable la plus sensible :</strong> ${mostSensitive?.nameFr ?? "—"} — une variation de ±${rangeMax}% modifie la VAN de ${fDA(mostSensitive?.npvAtMinRange ?? 0)} à ${fDA(mostSensitive?.npvAtMaxRange ?? 0)}.<br/>
-      <strong>📌 Seuil critique :</strong> ${mostSensitive?.breakEvenPct !== null && mostSensitive?.breakEvenPct !== undefined ? `La VAN atteint zéro avec une variation de ${f(mostSensitive.breakEvenPct, 1)}% sur ${mostSensitive.nameFr}.` : "Seuil hors plage analysée."}<br/>
-      <strong>🛡️ Variable la moins sensible :</strong> ${leastSensitive?.nameFr ?? "—"} — impact de ${fDA(leastSensitive?.impact ?? 0)} sur la plage totale → risque plus faible sur cette dimension.
+      <p style="margin:0 0 7px;">L'analyse compare ${variables.map(v => cleanName(v.nameFr)).join(", ")} autour des hypothèses de base. Sur la plage testée, l'effet moyen d'un point de pourcentage est de ${impactText}.</p>
+      <p style="margin:0 0 7px;">${cleanName(mostSensitive?.nameFr ?? "—")} est le paramètre le plus sensible : la valeur actuelle nette évolue de ${fDA(Math.min(mostSensitive?.npvAtMinRange ?? 0, mostSensitive?.npvAtMaxRange ?? 0))} à ${fDA(Math.max(mostSensitive?.npvAtMinRange ?? 0, mostSensitive?.npvAtMaxRange ?? 0))}, soit ${fDA(mostSensitive?.impact ?? 0)} d'écart. Une variation adverse réaliste de ${f(Math.abs(adversePoint?.pct ?? 0), 0)}% — une ${adverseDirection} — donnerait ${fDA(adversePoint?.npv ?? baseNPV)}, contre ${fDA(baseNPV)} au scénario de base. ${thresholdText}</p>
+      <p style="margin:0;">${cleanName(leastSensitive?.nameFr ?? "—")} reste le paramètre le moins sensible, avec ${fDA(leastSensitive?.impact ?? 0)} d'écart sur la plage complète. Le risque pratique est donc de concentrer le suivi sur ${cleanName(mostSensitive?.nameFr ?? "—")} : fixez un indicateur d'alerte et vérifiez cette hypothèse avant chaque décaissement important.</p>
     </div>`;
 
   return pageShell(content, 3, totalPages, "مخطط الإعصار والسيناريوهات · Tornade & Scénarios");

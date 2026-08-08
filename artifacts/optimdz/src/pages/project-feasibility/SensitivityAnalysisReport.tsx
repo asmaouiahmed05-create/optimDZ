@@ -42,6 +42,23 @@ export function SensitivityAnalysisReport({ result, projectName, sector }: Props
 
   const mostSensitive  = variables[0];
   const leastSensitive = variables[variables.length - 1];
+  const testedRange = Math.max(1, result.rangeMax - result.rangeMin);
+  const cleanVariableName = (name: string) => name.replace(/\s*\([^)]*\)/g, "");
+  const variableName = (v: typeof mostSensitive, arabic = false) =>
+    v ? cleanVariableName(arabic ? v.nameAr : v.nameFr) : "—";
+  const perPointImpact = (v: NonNullable<typeof mostSensitive>) => v.impact / testedRange;
+  const adversePoint = mostSensitive
+    ? [...mostSensitive.points]
+        .filter(point => mostSensitive.variable === "cashFlows" ? point.pct <= 0 : point.pct >= 0)
+        .sort((a, b) => {
+          const target = mostSensitive.variable === "cashFlows"
+            ? -scenarios[0].adjustmentPct
+            : scenarios[0].adjustmentPct;
+          return Math.abs(a.pct - target) - Math.abs(b.pct - target);
+        })[0]
+    : undefined;
+  const adverseDirection = mostSensitive?.variable === "cashFlows" ? "baisse" : "hausse";
+  const adverseDirectionAr = mostSensitive?.variable === "cashFlows" ? "انخفاض" : "ارتفاع";
 
   // ── Overall risk verdict ──────────────────────────────────────────────────
   const topRisk = breakEvenRisk(mostSensitive?.breakEvenPct ?? null);
@@ -55,8 +72,8 @@ export function SensitivityAnalysisReport({ result, projectName, sector }: Props
       badge: "bg-green-100 text-green-800 border-green-300",
       fr: "Risque FAIBLE — Projet robuste",
       ar: "مخاطر منخفضة — المشروع متين",
-      descFr: `Les hypothèses clés devraient subir des variations importantes avant de remettre en cause la viabilité du projet. Le paramètre le plus critique (${mostSensitive?.nameFr}) nécessite une variation de ${mostSensitive?.breakEvenPct !== null ? Math.abs(result.variables[0].breakEvenPct!).toFixed(1) + "%" : "hors plage"} pour annuler la VAN.`,
-      descAr: `الافتراضات الرئيسية تحتاج إلى تغيرات كبيرة قبل التأثير على جدوى المشروع. المتغير الأكثر حساسية (${mostSensitive?.nameAr}) يحتاج تغيراً بمقدار ${mostSensitive?.breakEvenPct !== null ? Math.abs(result.variables[0].breakEvenPct!).toFixed(1) + "%" : "خارج النطاق"} لإلغاء NPV.`,
+      descFr: "Les hypothèses testées disposent d'une marge confortable. Le projet peut absorber les écarts étudiés, mais les résultats restent à confirmer avec des données commerciales et financières actualisées.",
+      descAr: "للافتراضات المختبرة هامش مريح. يستطيع المشروع استيعاب الفروقات المدروسة، لكن يجب تأكيد النتائج ببيانات تجارية ومالية محدثة.",
     },
     moderate: {
       icon: "⚠️",
@@ -64,8 +81,8 @@ export function SensitivityAnalysisReport({ result, projectName, sector }: Props
       badge: "bg-amber-100 text-amber-800 border-amber-300",
       fr: "Risque MODÉRÉ — Surveiller les hypothèses",
       ar: "مخاطر معتدلة — مراقبة الافتراضات",
-      descFr: `Certains paramètres critiques sont relativement proches du seuil de rentabilité. Un suivi régulier des écarts entre prévisions et réalisations est recommandé, en particulier pour : ${mostSensitive?.nameFr}.`,
-      descAr: `بعض المتغيرات الحرجة قريبة نسبياً من عتبة الربحية. يُنصح بمتابعة دورية للفجوات بين التوقعات والنتائج الفعلية، خاصة لـ: ${mostSensitive?.nameAr}.`,
+      descFr: "Certains paramètres sont relativement proches du seuil de rentabilité. Les écarts entre prévisions et réalisations doivent être suivis régulièrement avant chaque décision d'engagement.",
+      descAr: "بعض المتغيرات قريبة نسبياً من عتبة الربحية. يجب متابعة الفروقات بين التوقعات والنتائج الفعلية بانتظام قبل كل قرار التزام.",
     },
     high: {
       icon: "🔴",
@@ -73,21 +90,31 @@ export function SensitivityAnalysisReport({ result, projectName, sector }: Props
       badge: "bg-red-100 text-red-800 border-red-300",
       fr: "Risque ÉLEVÉ — Hypothèses fragiles",
       ar: "مخاطر مرتفعة — افتراضات هشة",
-      descFr: `La viabilité du projet est très sensible aux hypothèses. Une variation modeste sur ${mostSensitive?.nameFr} suffit à rendre le projet non-rentable. Renforcez les garanties contractuelles et révisez les hypothèses de flux avant de vous engager.`,
-      descAr: `جدوى المشروع حساسة جداً للافتراضات. تغير بسيط في ${mostSensitive?.nameAr} كافٍ لجعل المشروع غير مربح. عزز الضمانات التعاقدية وراجع فرضيات التدفقات قبل الالتزام.`,
+      descFr: "La viabilité du projet est très sensible aux hypothèses. Avant de vous engager, sécurisez les revenus, confirmez les coûts et prévoyez un scénario de repli financé.",
+      descAr: "جدوى المشروع حساسة جداً للافتراضات. قبل الالتزام، أمّن الإيرادات وأكد التكاليف وجهّز سيناريو تراجع ممولاً.",
     },
   }[overallRisk];
 
-  // ── Situational analysis lines ─────────────────────────────────────────────
-  const analysisLines: { icon: string; text: string; color: string }[] = [
+  // ── Connected, manager-facing analysis paragraphs ─────────────────────────
+  const variableImpactSentence = variables
+    .map(v => `${cleanVariableName(v.nameFr)} : ${fmtDA(perPointImpact(v))} par point de pourcentage`)
+    .join(" ; ");
+  const variableImpactSentenceAr = variables
+    .map(v => `${cleanVariableName(v.nameAr)}: ${fmtDA(perPointImpact(v))} لكل نقطة مئوية`)
+    .join("؛ ");
+  const thresholdSentence = mostSensitive?.breakEvenPct !== null && mostSensitive?.breakEvenPct !== undefined
+    ? `Le seuil de viabilité apparaît après une ${mostSensitive.variable === "cashFlows" ? "baisse" : "hausse"} de ${fmtN(Math.abs(mostSensitive.breakEvenPct), 1)}% de cette variable.`
+    : "Aucun seuil de viabilité n'apparaît dans la plage testée.";
+  const thresholdSentenceAr = mostSensitive?.breakEvenPct !== null && mostSensitive?.breakEvenPct !== undefined
+    ? `تظهر عتبة الجدوى بعد ${mostSensitive.variable === "cashFlows" ? "انخفاض" : "ارتفاع"} هذا المتغير بنسبة ${fmtN(Math.abs(mostSensitive.breakEvenPct), 1)}٪.`
+    : "لا تظهر عتبة للجدوى ضمن النطاق المختبر.";
+  const analysisParagraphs: { icon: string; text: string; color: string }[] = [
     {
       icon: "📊",
       color: "bg-primary/10 border-primary/30",
       text: t(
-        `La VAN de base est ${fmtDA(npv)} avec un taux d'actualisation de ${fmtPct(r, 1)} sur ${n} ans. ` +
-        `L'analyse teste chaque hypothèse clé de ${result.rangeMin}% à +${result.rangeMax}% (pas de ${result.stepSize}%).`,
-        `NPV الأساسية ${fmtDA(npv)} بمعدل خصم ${fmtPct(r, 1)} على ${n} سنوات. ` +
-        `يختبر التحليل كل افتراض رئيسي من ${result.rangeMin}% إلى +${result.rangeMax}% (بخطوة ${result.stepSize}%).`
+        `L'analyse examine trois variables de décision — ${variables.map(v => cleanVariableName(v.nameFr)).join(", ")} — sur une plage de ${result.rangeMin}% à +${result.rangeMax}% autour des hypothèses de base. La valeur actuelle nette de référence est de ${fmtDA(npv)}, avec un taux d'actualisation de ${fmtPct(r, 1)} sur ${n} ans. Sur l'ensemble de la plage, l'effet moyen d'un point de pourcentage est de ${variableImpactSentence}.`,
+        `يفحص التحليل ثلاثة متغيرات قرار — ${variables.map(v => cleanVariableName(v.nameAr)).join("، ")} — ضمن نطاق من ${result.rangeMin}٪ إلى +${result.rangeMax}٪ حول الفرضيات الأساسية. تبلغ القيمة الحالية الصافية المرجعية ${fmtDA(npv)}، بمعدل خصم ${fmtPct(r, 1)} ولمدة ${n} سنوات. وعلى كامل النطاق، يبلغ الأثر المتوسط لكل نقطة مئوية ${variableImpactSentenceAr}.`
       ),
     },
     {
@@ -95,16 +122,10 @@ export function SensitivityAnalysisReport({ result, projectName, sector }: Props
       color: topRisk === "high" ? "bg-red-50 border-red-300" : topRisk === "moderate" ? "bg-amber-50 border-amber-300" : "bg-green-50 border-green-300",
       text: t(
         mostSensitive
-          ? `Variable la plus sensible : "${mostSensitive.nameFr}" — une variation de ±${result.rangeMax}% fait osciller la VAN entre ${fmtDA(mostSensitive.npvAtMinRange)} et ${fmtDA(mostSensitive.npvAtMaxRange)}, soit un écart de ${fmtDA(mostSensitive.impact)}. ` +
-            (mostSensitive.breakEvenPct !== null
-              ? `Le seuil critique est à ${fmtN(mostSensitive.breakEvenPct, 1)}% de variation (VAN = 0).`
-              : "Aucun seuil NPV=0 dans la plage analysée.")
+          ? `${variableName(mostSensitive)} est la variable la plus sensible : dans la plage testée, la VAN passe de ${fmtDA(Math.min(mostSensitive.npvAtMinRange, mostSensitive.npvAtMaxRange))} à ${fmtDA(Math.max(mostSensitive.npvAtMinRange, mostSensitive.npvAtMaxRange))}, soit ${fmtDA(mostSensitive.impact)} d'écart. Une variation adverse réaliste de ${Math.abs(adversePoint?.pct ?? 0)}% — ${adverseDirection} pour cette variable — donnerait une VAN de ${fmtDA(adversePoint?.npv ?? npv)}, contre ${fmtDA(npv)} au scénario de base. ${thresholdSentence}`
           : "Aucune variable analysée.",
         mostSensitive
-          ? `المتغير الأكثر حساسية: "${mostSensitive.nameAr}" — تغيير ±${result.rangeMax}% يُحرّك NPV بين ${fmtDA(mostSensitive.npvAtMinRange)} و${fmtDA(mostSensitive.npvAtMaxRange)}، فرق يبلغ ${fmtDA(mostSensitive.impact)}. ` +
-            (mostSensitive.breakEvenPct !== null
-              ? `العتبة الحرجة عند ${fmtN(mostSensitive.breakEvenPct, 1)}% تغيير (NPV = 0).`
-              : "لا توجد عتبة NPV=0 في النطاق المُحلَّل.")
+          ? `${variableName(mostSensitive, true)} هو المتغير الأكثر حساسية: ضمن النطاق المختبر، تتحرك القيمة الحالية الصافية من ${fmtDA(Math.min(mostSensitive.npvAtMinRange, mostSensitive.npvAtMaxRange))} إلى ${fmtDA(Math.max(mostSensitive.npvAtMinRange, mostSensitive.npvAtMaxRange))}، بفارق ${fmtDA(mostSensitive.impact)}. ويؤدي تغير سلبي واقعي بنسبة ${Math.abs(adversePoint?.pct ?? 0)}٪ — ${adverseDirectionAr} لهذا المتغير — إلى قيمة حالية صافية قدرها ${fmtDA(adversePoint?.npv ?? npv)} بدلاً من ${fmtDA(npv)} في السيناريو الأساسي. ${thresholdSentenceAr}`
           : "لا توجد متغيرات مُحللة."
       ),
     },
@@ -113,16 +134,10 @@ export function SensitivityAnalysisReport({ result, projectName, sector }: Props
       color: "bg-secondary/10 border-secondary/30",
       text: t(
         leastSensitive && leastSensitive !== mostSensitive
-          ? `Variable la moins sensible : "${leastSensitive.nameFr}" — impact de ${fmtDA(leastSensitive.impact)} sur la plage complète. ` +
-            (leastSensitive.breakEvenPct !== null
-              ? `Seuil critique lointain : ${fmtN(leastSensitive.breakEvenPct, 1)}% → risque faible sur cette dimension.`
-              : "Pas de seuil NPV=0 dans la plage → dimension peu risquée.")
+          ? `À l'inverse, ${variableName(leastSensitive)} est la moins sensible : son impact total est de ${fmtDA(leastSensitive.impact)}, soit environ ${fmtDA(perPointImpact(leastSensitive))} par point de pourcentage. Le risque prioritaire n'est donc pas de répartir les contrôles également, mais de sécuriser d'abord ${variableName(mostSensitive)}. Dans la pratique, cela signifie fixer un indicateur de suivi et un seuil d'alerte sur cette hypothèse avant de mobiliser le capital.`
           : "Toutes les variables ont un impact similaire sur la VAN.",
         leastSensitive && leastSensitive !== mostSensitive
-          ? `المتغير الأقل حساسية: "${leastSensitive.nameAr}" — تأثير ${fmtDA(leastSensitive.impact)} على النطاق الكامل. ` +
-            (leastSensitive.breakEvenPct !== null
-              ? `العتبة الحرجة بعيدة: ${fmtN(leastSensitive.breakEvenPct, 1)}% → مخاطر منخفضة على هذا البُعد.`
-              : "لا توجد عتبة NPV=0 في النطاق → بُعد منخفض المخاطر.")
+          ? `في المقابل، ${variableName(leastSensitive, true)} هو الأقل حساسية: يبلغ أثره الإجمالي ${fmtDA(leastSensitive.impact)}، أي نحو ${fmtDA(perPointImpact(leastSensitive))} لكل نقطة مئوية. لذلك لا ينبغي توزيع الرقابة بالتساوي، بل يجب أولاً تأمين ${variableName(mostSensitive, true)}. عملياً، يعني ذلك تحديد مؤشر متابعة وحد إنذار لهذا الافتراض قبل تعبئة رأس المال.`
           : "جميع المتغيرات لها تأثير مماثل على NPV."
       ),
     },
@@ -130,75 +145,43 @@ export function SensitivityAnalysisReport({ result, projectName, sector }: Props
       icon: scenarios[0].result.npv > 0 ? "✅" : "🔴",
       color: scenarios[0].result.npv > 0 ? "bg-green-50 border-green-300" : "bg-red-50 border-red-300",
       text: t(
-        `Scénario pessimiste (−${scenarios[0].adjustmentPct}% flux, +${scenarios[0].adjustmentPct}% coûts & taux) → VAN = ${fmtDA(scenarios[0].result.npv)} ${scenarios[0].result.npv >= 0 ? "(viable même sous pression ✅)" : "(projet non-rentable sous pression 🔴)"}. ` +
-        `Scénario optimiste (+${scenarios[2].adjustmentPct}%) → VAN = ${fmtDA(scenarios[2].result.npv)}.`,
-        `السيناريو المتشائم (−${scenarios[0].adjustmentPct}% تدفقات، +${scenarios[0].adjustmentPct}% تكاليف ومعدل) → NPV = ${fmtDA(scenarios[0].result.npv)} ${scenarios[0].result.npv >= 0 ? "(جدوى قائمة تحت الضغط ✅)" : "(المشروع غير مربح تحت الضغط 🔴)"}. ` +
-        `السيناريو المتفائل (+${scenarios[2].adjustmentPct}%) → NPV = ${fmtDA(scenarios[2].result.npv)}.`
+        `Le test combiné confirme la portée de ce risque : avec ${scenarios[0].adjustmentPct}% de flux en moins et ${scenarios[0].adjustmentPct}% de coûts et de taux en plus, la VAN ressort à ${fmtDA(scenarios[0].result.npv)}, contre ${fmtDA(npv)} au départ. Le scénario optimiste atteint ${fmtDA(scenarios[2].result.npv)}. ${scenarios[0].result.npv >= 0 ? "Le projet reste positif sous pression, mais la marge doit être protégée par un suivi des hypothèses." : "Le projet devient négatif sous pression : la décision devrait être conditionnée à des garanties de revenus, à une enveloppe de coûts maîtrisée et à un financement de la phase précédant la rentabilité."}`,
+        `يؤكد الاختبار المجمع حجم المخاطر: مع انخفاض التدفقات بنسبة ${scenarios[0].adjustmentPct}٪ وارتفاع التكاليف ومعدل الخصم بالنسبة نفسها، تبلغ القيمة الحالية الصافية ${fmtDA(scenarios[0].result.npv)} مقابل ${fmtDA(npv)} في البداية. ويصل السيناريو المتفائل إلى ${fmtDA(scenarios[2].result.npv)}. ${scenarios[0].result.npv >= 0 ? "يبقى المشروع موجباً تحت الضغط، لكن يجب حماية الهامش بمتابعة الفرضيات." : "يصبح المشروع سالباً تحت الضغط، لذلك يجب ربط القرار بضمانات للإيرادات وسقف للتكاليف وتمويل للمرحلة السابقة للربحية."}`
       ),
     },
   ];
 
   // ── Suggestions ────────────────────────────────────────────────────────────
-  interface Suggestion { icon: string; title: string; desc: string; color: string; borderColor: string; }
+  interface Suggestion { icon: string; desc: string; color: string; borderColor: string; }
   const suggestions: Suggestion[] = [];
 
-  // Most sensitive variable advice
+  // Keep recommendations action-oriented and distinct from the analysis paragraphs.
   if (mostSensitive) {
     if (mostSensitive.variable === "cashFlows") {
       suggestions.push({
         icon: "📋",
         color: "bg-primary/5", borderColor: "border-l-primary",
-        title: t(
-          `Sécuriser les flux — paramètre critique : ${mostSensitive.nameFr}`,
-          `تأمين التدفقات — المتغير الحرج: ${mostSensitive.nameAr}`
-        ),
         desc: t(
-          `La VAN est très sensible aux flux de trésorerie annuels (impact ${fmtDA(mostSensitive.impact)} sur ±${result.rangeMax}%). Priorisez la signature de contrats ou lettres d'intention avec les clients avant de mobiliser le capital. ` +
-          (mostSensitive.breakEvenPct !== null
-            ? `Une baisse de ${fmtN(Math.abs(mostSensitive.breakEvenPct), 1)}% des flux suffit à rendre le projet non-rentable.`
-            : ""),
-          `NPV حساسة جداً للتدفقات السنوية (تأثير ${fmtDA(mostSensitive.impact)} عند ±${result.rangeMax}%). أولوية توقيع العقود أو خطابات النية مع العملاء قبل تعبئة رأس المال. ` +
-          (mostSensitive.breakEvenPct !== null
-            ? `انخفاض ${fmtN(Math.abs(mostSensitive.breakEvenPct), 1)}% في التدفقات يكفي لجعل المشروع غير مربح.`
-            : "")
+          `Avant de mobiliser le capital, sécurisez les encaissements par des contrats, des lettres d'intention ou un plan commercial vérifiable, puis suivez les flux réalisés mois par mois.`,
+          `قبل تعبئة رأس المال، أمّن التحصيلات بعقود أو خطابات نية أو خطة تجارية قابلة للتحقق، ثم تابع التدفقات الفعلية شهرياً.`
         ),
       });
     } else if (mostSensitive.variable === "initialInvestment") {
       suggestions.push({
         icon: "💰",
         color: "bg-amber-50", borderColor: "border-l-amber-500",
-        title: t(
-          `Maîtriser le coût d'investissement — paramètre critique : ${mostSensitive.nameFr}`,
-          `ضبط تكلفة الاستثمار — المتغير الحرج: ${mostSensitive.nameAr}`
-        ),
         desc: t(
-          `L'investissement initial est le levier le plus influent. Obtenez des devis fermes et un calendrier précis des dépenses avant de valider le projet. ` +
-          (mostSensitive.breakEvenPct !== null
-            ? `Une augmentation de ${fmtN(Math.abs(mostSensitive.breakEvenPct), 1)}% du coût initial annule la VAN.`
-            : ""),
-          `الاستثمار الأولي هو أكثر المتغيرات تأثيراً. احصل على عروض أسعار نهائية وجدول زمني دقيق للإنفاق قبل المصادقة على المشروع. ` +
-          (mostSensitive.breakEvenPct !== null
-            ? `زيادة ${fmtN(Math.abs(mostSensitive.breakEvenPct), 1)}% في التكلفة الأولية تُلغي NPV.`
-            : "")
+          `Avant validation, obtenez des devis fermes, découpez les décaissements par jalon et conservez une réserve dédiée aux dépassements afin que le coût final ne dérive pas sans décision.`,
+          `قبل المصادقة، احصل على عروض أسعار نهائية وقسّم المدفوعات حسب المراحل واحتفظ باحتياطي للتجاوزات حتى لا ترتفع التكلفة النهائية دون قرار.`
         ),
       });
     } else if (mostSensitive.variable === "discountRate") {
       suggestions.push({
         icon: "📊",
         color: "bg-primary/5", borderColor: "border-l-primary",
-        title: t(
-          `Risque de taux — paramètre critique : ${mostSensitive.nameFr}`,
-          `مخاطر معدل الخصم — المتغير الحرج: ${mostSensitive.nameAr}`
-        ),
         desc: t(
-          `La VAN est très sensible au taux d'actualisation. Vérifiez si le taux de ${fmtPct(r, 1)} est cohérent avec le risque réel du projet. ` +
-          (mostSensitive.breakEvenPct !== null
-            ? `Le taux pourrait monter jusqu'à ${fmtN(r * (1 + mostSensitive.breakEvenPct / 100), 2)}% (variation de +${fmtN(mostSensitive.breakEvenPct, 1)}%) avant que la VAN s'annule.`
-            : ""),
-          `NPV حساسة جداً لمعدل الخصم. تحقق من أن معدل ${fmtPct(r, 1)} متوافق مع المخاطر الفعلية للمشروع. ` +
-          (mostSensitive.breakEvenPct !== null
-            ? `يمكن أن يرتفع المعدل إلى ${fmtN(r * (1 + mostSensitive.breakEvenPct / 100), 2)}% (زيادة +${fmtN(mostSensitive.breakEvenPct, 1)}%) قبل أن تتحول NPV إلى الصفر.`
-            : "")
+          `Validez le taux de financement avec le prêteur et réexaminez-le si les conditions de crédit changent ; un taux de référence trop optimiste peut faire paraître le projet rentable avant de fragiliser sa trésorerie.`,
+          `تحقق من معدل التمويل مع المقرض وأعد مراجعته إذا تغيرت شروط الائتمان؛ فالمعدل المتفائل أكثر من اللازم قد يجعل المشروع يبدو مربحاً ثم يضغط على خزينته.`
         ),
       });
     }
@@ -209,46 +192,18 @@ export function SensitivityAnalysisReport({ result, projectName, sector }: Props
     suggestions.push({
       icon: "🔴",
       color: "bg-red-50", borderColor: "border-l-red-500",
-      title: t("Scénario pessimiste non-viable — plan de mitigation requis", "السيناريو المتشائم غير جدوى — يُستوجب خطة تخفيف"),
       desc: t(
-        `Dans le scénario pessimiste, la VAN devient ${fmtDA(scenarios[0].result.npv)}. Identifiez des leviers concrets pour réduire les coûts ou garantir les revenus dans ce cas adverse : contrats à long terme, couvertures de prix, plans de réduction des coûts fixes.`,
-        `في السيناريو المتشائم، تصبح NPV ${fmtDA(scenarios[0].result.npv)}. حدد رافعات ملموسة لخفض التكاليف أو ضمان الإيرادات في هذه الحالة: عقود طويلة الأجل، تحوطات أسعار، خطط لتخفيض التكاليف الثابتة.`
+        `Le scénario défavorable devient déficitaire avec une VAN de ${fmtDA(scenarios[0].result.npv)}. Préparez avant l'engagement un plan de réduction des coûts et une solution de financement de la période précédant la rentabilité.`,
+        `يصبح السيناريو المعاكس عجزاً بقيمة حالية صافية قدرها ${fmtDA(scenarios[0].result.npv)}. جهّز قبل الالتزام خطة لتخفيض التكاليف وحلاً لتمويل الفترة السابقة للربحية.`
       ),
     });
   } else {
     suggestions.push({
       icon: "✅",
       color: "bg-green-50", borderColor: "border-l-green-600",
-      title: t("Résilience confirmée au scénario pessimiste", "مرونة مؤكدة في السيناريو المتشائم"),
       desc: t(
-        `Même sous des conditions défavorables (−${scenarios[0].adjustmentPct}% flux, +${scenarios[0].adjustmentPct}% coûts), le projet reste viable avec une VAN de ${fmtDA(scenarios[0].result.npv)}. Cela renforce la confiance dans la décision d'investir.`,
-        `حتى في ظروف معاكسة (−${scenarios[0].adjustmentPct}% تدفقات، +${scenarios[0].adjustmentPct}% تكاليف)، يبقى المشروع جدوى بـ NPV ${fmtDA(scenarios[0].result.npv)}. هذا يعزز الثقة في قرار الاستثمار.`
-      ),
-    });
-  }
-
-  // IRR cushion advice
-  if (irr !== null) {
-    const irrCushion = irr - r;
-    suggestions.push({
-      icon: irrCushion > 5 ? "📈" : irrCushion > 0 ? "⚠️" : "🔴",
-      color: irrCushion > 5 ? "bg-primary/5" : "bg-amber-50",
-      borderColor: irrCushion > 5 ? "border-l-primary" : "border-l-amber-500",
-      title: t(
-        `Marge TRI : ${fmtN(irrCushion, 2)} points au-dessus du taux requis`,
-        `هامش IRR: ${fmtN(irrCushion, 2)} نقطة فوق المعدل المطلوب`
-      ),
-      desc: t(
-        irrCushion > 5
-          ? `Le TRI (${fmtPct(irr, 2)}) dépasse largement le taux requis (${fmtPct(r, 1)}). Le coût du capital pourrait augmenter de ${fmtN(irrCushion, 2)} points avant de remettre en cause la rentabilité — signal positif pour les prêteurs et investisseurs.`
-          : irrCushion > 0
-          ? `Le TRI (${fmtPct(irr, 2)}) est légèrement supérieur au taux requis (${fmtPct(r, 1)}). La marge de ${fmtN(irrCushion, 2)} points est étroite — surveillez de près les conditions de financement et l'évolution des taux.`
-          : `Le TRI (${fmtPct(irr, 2)}) est en dessous du taux requis (${fmtPct(r, 1)}). Le projet ne génère pas le rendement minimum attendu — révisez les paramètres ou le taux requis.`,
-        irrCushion > 5
-          ? `IRR (${fmtPct(irr, 2)}) يتجاوز المعدل المطلوب (${fmtPct(r, 1)}) بفارق كبير. يمكن للتمويل أن يرتفع ${fmtN(irrCushion, 2)} نقطة قبل التأثير على الربحية — إشارة إيجابية للمقرضين والمستثمرين.`
-          : irrCushion > 0
-          ? `IRR (${fmtPct(irr, 2)}) أعلى قليلاً من المعدل المطلوب (${fmtPct(r, 1)}). الهامش ${fmtN(irrCushion, 2)} نقطة ضيق — راقب ظروف التمويل وتطور المعدلات عن كثب.`
-          : `IRR (${fmtPct(irr, 2)}) دون المعدل المطلوب (${fmtPct(r, 1)}). المشروع لا يُحقق الحد الأدنى للعائد — راجع المتغيرات أو المعدل المطلوب.`
+        `Le scénario défavorable reste positif avec une VAN de ${fmtDA(scenarios[0].result.npv)}. Vous pouvez avancer avec davantage de confiance, à condition de conserver un suivi des hypothèses et une réserve de sécurité.`,
+        `يبقى السيناريو المعاكس موجباً بقيمة حالية صافية قدرها ${fmtDA(scenarios[0].result.npv)}. يمكنك التقدم بثقة أكبر، مع الإبقاء على متابعة الفرضيات واحتياطي أمان.`
       ),
     });
   }
@@ -256,10 +211,9 @@ export function SensitivityAnalysisReport({ result, projectName, sector }: Props
   suggestions.push({
     icon: "🔄",
     color: "bg-secondary/5", borderColor: "border-l-secondary",
-    title: t("Réévaluer les hypothèses lors des jalons clés", "إعادة تقييم الافتراضات عند المراحل الرئيسية"),
     desc: t(
-      `L'analyse de sensibilité est un outil dynamique. Revisitez ces calculs à chaque jalon important (fin de construction, première année d'exploitation, révision du plan de financement) pour ajuster les décisions en temps réel.`,
-      `تحليل الحساسية أداة ديناميكية. أعد هذه الحسابات عند كل مرحلة رئيسية (نهاية الإنشاء، السنة الأولى للتشغيل، مراجعة خطة التمويل) لتعديل القرارات في الوقت الحقيقي.`
+      `Actualisez l'analyse à la fin des travaux, après la première année d'exploitation et à chaque révision du financement. C'est à ces jalons que les hypothèses testées peuvent être remplacées par des observations réelles.`,
+      `حدّث التحليل عند نهاية الأشغال وبعد السنة الأولى من التشغيل وعند كل مراجعة للتمويل. في هذه المراحل يمكن استبدال الفرضيات المختبرة بملاحظات فعلية.`
     ),
   });
 
@@ -370,7 +324,7 @@ export function SensitivityAnalysisReport({ result, projectName, sector }: Props
           {t("Analyse de la Situation", "تحليل الوضع")}
         </h2>
         <div className="space-y-2">
-          {analysisLines.map((line, i) => (
+          {analysisParagraphs.map((line, i) => (
             <div key={i}
               className={cn("flex items-start gap-3 rounded-lg border px-4 py-3 text-sm", line.color)}>
               <span className="text-base leading-snug shrink-0">{line.icon}</span>
@@ -392,7 +346,6 @@ export function SensitivityAnalysisReport({ result, projectName, sector }: Props
               className={cn("flex items-start gap-3 rounded-lg border-l-4 px-4 py-3", s.color, s.borderColor)}>
               <span className="text-lg shrink-0 mt-0.5">{s.icon}</span>
               <div className="space-y-1">
-                <p className="font-semibold text-sm">{s.title}</p>
                 <p className="text-sm text-muted-foreground leading-relaxed">{s.desc}</p>
               </div>
             </div>
