@@ -2,6 +2,6 @@
 - [Financial Analysis module](financial-analysis-module.md) — Break-even/CVP at /financial-analysis; same layout/PDF/save pattern as PERT/CPM.
 - [Project Feasibility module](project-feasibility-module.md) — Mini-dashboard at /project-feasibility; 2 active tools: break-even (/breakeven) and investment appraisal (/investment-appraisal).
 - [KPI Dashboard module](kpi-dashboard-module.md) — Mini-dashboard at /kpi-dashboard; 1 active tool: Manual KPI Tracking (/kpi-dashboard/tracking); 1 coming-soon: Connectors.
-- [Variance Analysis module](variance-analysis-module.md) — 5 modes: revenue/materials/labor/overhead (4-variance) + Overall synthesis at /variance-analysis/overall; CSS waterfall chart, no external lib.
+- [Variance Analysis module](variance-analysis-module.md) — 5 modes plus manager-facing narratives that state computed price/quantity/total effects, favorability, driver, and one focused action.
 - [Supply Chain module](supply-chain-module.md) — 3 active tools at /supply-chain: inventory (EOQ/ABC), forecast (MA/ES), suppliers (weighted multicriteria); t(fr,ar) order is FRENCH FIRST — failure to follow this caused a full-page i18n audit on the forecast module.
 - [Industrial Management module](industrial-management-module.md) — 5 active tools: MRP, Workshop Scheduling, Capacity Planning, Quality Control, Maintenance (/industrial-management/maintenance); algorithms in *Algorithm.ts files; X-bar uses σ/√n̄ limits, P uses per-sample √(p̄(1-p̄)/n) limits; Maintenance uses MTBF/MTTR/Disponibilité with pannes=0 guard.

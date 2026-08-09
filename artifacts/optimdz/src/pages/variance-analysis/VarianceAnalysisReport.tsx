@@ -227,8 +227,72 @@ export function VarianceAnalysisReport({ problemName, sector, objective, rows, t
     })(),
   ];
 
+  // Replace the legacy fragments above with connected, data-driven paragraphs.
+  // The calculation layer in VarianceAnalysis.tsx remains untouched.
+  const standardBase = rows.reduce(
+    (sum, row) => sum + (isOverhead ? row.standardPrice : row.standardPrice * row.standardQty),
+    0,
+  );
+  const baseShare = (value: number) => standardBase > 0 ? Math.abs(value) / standardBase * 100 : 0;
+  const statusFr = (value: number) =>
+    value === 0 ? "neutre" : (favWhen === "positive" ? value > 0 : value < 0) ? "favorable" : "défavorable";
+  const statusAr = (value: number) =>
+    value === 0 ? "محايد" : (favWhen === "positive" ? value > 0 : value < 0) ? "مُلائم" : "غير مُلائم";
+  const overallFr = totalNeutral ? "neutre" : totalFav ? "globalement favorable" : "globalement défavorable";
+  const overallAr = totalNeutral ? "محايد" : totalFav ? "مُلائم إجمالاً" : "غير مُلائم إجمالاً";
+  const components = [
+    { key: "price", fr: cfg.priceVarFr, ar: cfg.priceVarAr, value: totals.priceVariance },
+    { key: "qty", fr: cfg.qtyVarFr, ar: cfg.qtyVarAr, value: totals.qtyVariance },
+    ...(isOverhead ? [
+      { key: "var3", fr: cfg.var3VarFr ?? "Écart/Activité", ar: cfg.var3VarAr ?? "انحراف النشاط", value: totals.var3 ?? 0 },
+      { key: "var4", fr: cfg.var4VarFr ?? "Écart/Sous-activité", ar: cfg.var4VarAr ?? "انحراف قصور النشاط", value: totals.var4 ?? 0 },
+    ] : []),
+  ];
+  const largest = components.reduce((a, b) => Math.abs(b.value) > Math.abs(a.value) ? b : a);
+  const significant = components.filter(component => baseShare(component.value) >= 5);
+  const significantFr = significant.length
+    ? significant.map(component => `${component.fr} (${fDA(component.value, "fr")}, ${baseShare(component.value).toFixed(1)}% de la base)`).join(" et ")
+    : "aucun effet individuel ne dépasse 5 % de la base";
+  const significantAr = significant.length
+    ? significant.map(component => `${component.ar} (${fDA(component.value, "ar")}، ${baseShare(component.value).toFixed(1)}٪ من القاعدة)`).join(" و")
+    : "لا يتجاوز أي أثر فردي 5٪ من القاعدة";
+  const priceIsLarger = Math.abs(totals.priceVariance) >= Math.abs(totals.qtyVariance);
+  const driverFr = priceIsLarger
+    ? `L'effet prix est le plus important avec ${fDA(totals.priceVariance, "fr")} (${statusFr(totals.priceVariance)}). Il signale une différence sur ${objective === "revenue" ? "le prix de vente" : objective === "labor" ? "le taux horaire" : objective === "overhead" ? "les charges engagées par rapport au budget" : "le coût d'achat"} : le premier levier à vérifier est donc le prix ou le coût unitaire.`
+    : `L'effet quantité est le plus important avec ${fDA(totals.qtyVariance, "fr")} (${statusFr(totals.qtyVariance)}). Il signale une différence sur ${objective === "revenue" ? "le volume vendu" : objective === "labor" ? "les heures consommées et la productivité" : objective === "overhead" ? "le rendement de l'activité" : "la quantité consommée"} : le premier levier à vérifier est donc le volume, les heures ou l'efficience.`;
+  const driverAr = priceIsLarger
+    ? `أثر السعر هو الأكبر بقيمة ${fDA(totals.priceVariance, "ar")} وهو ${statusAr(totals.priceVariance)}. ويشير إلى فرق في ${objective === "revenue" ? "سعر البيع" : objective === "labor" ? "الأجر الساعي" : objective === "overhead" ? "التكاليف الفعلية مقارنة بالميزانية" : "تكلفة الشراء"}؛ لذلك يجب فحص السعر أو التكلفة الوحدوية أولاً.`
+    : `أثر الكمية هو الأكبر بقيمة ${fDA(totals.qtyVariance, "ar")} وهو ${statusAr(totals.qtyVariance)}. ويشير إلى فرق في ${objective === "revenue" ? "حجم المبيعات" : objective === "labor" ? "الساعات المستهلكة والإنتاجية" : objective === "overhead" ? "مردودية النشاط" : "الكمية المستهلكة"}؛ لذلك يجب فحص الحجم أو الساعات أو الكفاءة أولاً.`;
+
+  analysisLines.splice(0, analysisLines.length,
+    {
+      icon: "📊",
+      color: "bg-primary/10 border-primary/30",
+      text: t(
+        `Sur ${rows.length} élément(s) de ${cfg.nameFr}, l'écart prix est de ${fDA(totals.priceVariance, "fr")} (${statusFr(totals.priceVariance)}) et l'écart quantité est de ${fDA(totals.qtyVariance, "fr")} (${statusFr(totals.qtyVariance)}). Avec les effets complémentaires du mode charges indirectes lorsqu'ils existent, l'écart total atteint ${fDA(totals.totalVariance, "fr")} : la situation est ${overallFr}.`,
+        `يشمل التحليل ${rows.length} عنصر(ات) من ${cfg.nameAr}. يبلغ انحراف السعر ${fDA(totals.priceVariance, "ar")} وهو ${statusAr(totals.priceVariance)}، بينما يبلغ انحراف الكمية ${fDA(totals.qtyVariance, "ar")} وهو ${statusAr(totals.qtyVariance)}. ومع إضافة الآثار المكملة في وضع التكاليف غير المباشرة، يبلغ الانحراف الإجمالي ${fDA(totals.totalVariance, "ar")}؛ وبالتالي فإن الوضع ${overallAr}.`,
+      ),
+    },
+    {
+      icon: priceIsLarger ? "🏷️" : "⏱️",
+      color: "bg-secondary/10 border-secondary/30",
+      text: t(
+        `${driverFr} Les effets significatifs sont ${significantFr}. Cette lecture distingue ainsi un problème de prix ou de coût d'un problème de volume, d'heures ou de consommation, au lieu de traiter l'écart total comme un seul signal.`,
+        `${driverAr} وتتمثل الآثار المهمة في ${significantAr}. وبهذا تميّز القراءة الإدارية بين مشكلة السعر أو التكلفة ومشكلة الحجم أو الساعات أو الاستهلاك، بدلاً من التعامل مع الانحراف الإجمالي كإشارة واحدة.`,
+      ),
+    },
+    {
+      icon: totalFav ? "✅" : "⚠️",
+      color: totalFav ? "bg-green-50 border-green-300" : "bg-amber-50 border-amber-300",
+      text: t(
+        `Le plus grand écart en valeur absolue est ${largest.fr}, à ${fDA(largest.value, "fr")} (${statusFr(largest.value)}), soit ${baseShare(largest.value).toFixed(1)}% de la base standard. ${isOverhead ? `Les autres composantes restent à suivre : activité ${fDA(totals.var3 ?? 0, "fr")} et sous-activité ${fDA(totals.var4 ?? 0, "fr")}.` : "Ce poids indique le point où une décision managériale ciblée aura le meilleur effet sur le résultat."}`,
+        `أكبر انحراف بالقيمة المطلقة هو ${largest.ar} بقيمة ${fDA(largest.value, "ar")} وهو ${statusAr(largest.value)}، ويمثل ${baseShare(largest.value).toFixed(1)}٪ من القاعدة المعيارية. ${isOverhead ? `ويجب متابعة المكونات الأخرى أيضاً: النشاط ${fDA(totals.var3 ?? 0, "ar")} وقصور النشاط ${fDA(totals.var4 ?? 0, "ar")}.` : "ويحدد هذا التركّز المجال الذي سيحقق فيه القرار الإداري أكبر أثر على النتيجة."}`,
+      ),
+    },
+  );
+
   // ── Suggestions ────────────────────────────────────────────────────────────
-  interface Sug { icon: string; title: string; desc: string; color: string; borderColor: string; }
+  interface Sug { icon: string; title?: string; desc: string; color: string; borderColor: string; }
   const suggestions: Sug[] = [];
 
   if (isOverhead) {
@@ -405,6 +469,74 @@ export function VarianceAnalysisReport({ problemName, sector, objective, rows, t
               ? "ضع خطة عمل SMART لكل مركز تحليل: عيّن مسؤولاً لكل مركز، وحدّد أهدافاً للاستيعاب والمردودية، وأنشئ تقريراً شهرياً للتكاليف غير المباشرة."
               : "ضع خطة عمل SMART: حدّد المسؤولين والمواعيد ومؤشرات المتابعة لكل انحراف غير مُلائم تم تحديده."
           ),
+    });
+  }
+
+  // Keep recommendations concise and tied to the largest computed driver.
+  // The legacy branch above is retained for compatibility with older copy,
+  // but its cards are replaced before rendering to avoid repeated messages.
+  const largestActionFr = largest.key === "price"
+    ? objective === "revenue"
+      ? "réviser la grille tarifaire, les remises et la segmentation client"
+      : objective === "labor"
+      ? "analyser les heures supplémentaires, les primes et les reclassifications"
+      : objective === "overhead"
+      ? "auditer les centres de coût, les contrats externes et les consommations hors norme"
+      : "renégocier les contrats fournisseurs et vérifier les alternatives d'achat"
+    : largest.key === "qty"
+    ? objective === "revenue"
+      ? "renforcer l'action commerciale et analyser les causes du volume vendu"
+      : objective === "labor"
+      ? "suivre les arrêts, les absences et le temps de cycle"
+      : objective === "overhead"
+      ? "suivre le rendement de l'activité et les temps d'arrêt"
+      : "contrôler les rebuts, les erreurs de dosage et les consommations par lot"
+    : largest.key === "var4"
+    ? "rapprocher le niveau d'activité des capacités engagées et ajuster les charges fixes"
+    : "revoir le taux d'imputation et le niveau d'activité retenu dans le budget";
+  const largestActionAr = largest.key === "price"
+    ? objective === "revenue"
+      ? "مراجعة جدول الأسعار والخصومات وتصنيف العملاء"
+      : objective === "labor"
+      ? "تحليل الساعات الإضافية والعلاوات وإعادة التصنيف"
+      : objective === "overhead"
+      ? "تدقيق مراكز التكلفة والعقود الخارجية والاستهلاكات غير العادية"
+      : "إعادة التفاوض على عقود الموردين والتحقق من بدائل الشراء"
+    : largest.key === "qty"
+    ? objective === "revenue"
+      ? "تعزيز الجهد التجاري وتحليل أسباب حجم المبيعات"
+      : objective === "labor"
+      ? "متابعة التوقفات والغيابات وزمن الدورة"
+      : objective === "overhead"
+      ? "متابعة مردودية النشاط وأوقات التوقف"
+      : "مراقبة الهدر وأخطاء الجرعات والاستهلاك حسب الدفعة"
+    : largest.key === "var4"
+    ? "تقريب مستوى النشاط من الطاقة الملتزم بها وضبط التكاليف الثابتة"
+    : "مراجعة معدل التحميل ومستوى النشاط المعتمد في الميزانية";
+
+  suggestions.splice(0, suggestions.length);
+  suggestions.push({
+    icon: totalFav ? "🎯" : "🔴",
+    color: totalFav ? "bg-primary/5" : "bg-red-50",
+    borderColor: totalFav ? "border-l-primary" : "border-l-red-500",
+    desc: t(
+      `${largest.fr} représente ${fDA(largest.value, "fr")} (${baseShare(largest.value).toFixed(1)}% de la base). ${totalFav ? "Pour consolider cette performance, commencez par" : "Pour réduire cet écart défavorable, commencez par"} ${largestActionFr}, puis vérifiez l'évolution de cet indicateur à la prochaine clôture.`,
+      `${largest.ar} يمثل ${fDA(largest.value, "ar")} (${baseShare(largest.value).toFixed(1)}٪ من القاعدة). ${totalFav ? "لتوطيد هذا الأداء، ابدأ بـ" : "للحد من هذا الانحراف غير الملائم، ابدأ بـ"} ${largestActionAr}، ثم تحقق من تطور هذا المؤشر عند الإقفال القادم.`,
+    ),
+  });
+  if (!totalNeutral) {
+    suggestions.push({
+      icon: totalFav ? "✅" : "🔄",
+      color: totalFav ? "bg-green-50" : "bg-amber-50",
+      borderColor: totalFav ? "border-l-green-500" : "border-l-amber-500",
+      desc: t(
+        totalFav
+          ? `L'écart total de ${fDA(totals.totalVariance, "fr")} est favorable. Conservez les pratiques qui expliquent le gain et actualisez les standards uniquement après avoir confirmé qu'il est reproductible.`
+          : `L'écart total de ${fDA(totals.totalVariance, "fr")} est défavorable. Attribuez un responsable au plus grand écart, fixez une échéance et comparez le résultat à ce même indicateur chaque mois.`,
+        totalFav
+          ? `الانحراف الإجمالي البالغ ${fDA(totals.totalVariance, "ar")} مُلائم. حافظ على الممارسات التي تفسر المكسب ولا تحدّث المعايير إلا بعد التأكد من إمكانية تكراره.`
+          : `الانحراف الإجمالي البالغ ${fDA(totals.totalVariance, "ar")} غير مُلائم. عيّن مسؤولاً عن أكبر انحراف وحدد أجلاً وقارن النتيجة بالمؤشر نفسه شهرياً.`,
+      ),
     });
   }
 
@@ -739,7 +871,7 @@ export function VarianceAnalysisReport({ problemName, sector, objective, rows, t
             )}>
               <span className="text-lg shrink-0 mt-0.5">{s.icon}</span>
               <div className="space-y-1">
-                <p className="font-semibold text-sm">{s.title}</p>
+                {s.title && <p className="font-semibold text-sm">{s.title}</p>}
                 <p className="text-sm text-muted-foreground leading-relaxed">{s.desc}</p>
               </div>
             </div>

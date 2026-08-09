@@ -64,6 +64,15 @@ POST /api/problems — objective in problemData; all 4 variances in result.total
 3. Analysis + Ratios card + Recommendations
 4. Digital stamp
 
+## Reporting convention
+- The four-mode report and its PDF should present connected, data-driven paragraphs rather than repeated label fragments.
+- The narrative states the computed price variance, quantity variance, total variance, favorability according to the objective, significant effects, dominant driver, and a practical action for the largest effect.
+- Recommendation cards should not repeat a separate title that restates the analysis; use a focused action paragraph instead.
+
+**Why:** Managers need the numerical cause and business implication in one readable decision path, while calculation formulas remain independently testable and unchanged.
+
+**How to apply:** When extending the four-mode report, derive wording from `VarianceTotals` and the objective’s favorability direction; keep PDF and screen copy aligned and do not alter `computeRows`/`computeTotals` for presentation changes.
+
 ## 5th mode: Overall Result Synthesis (الانحراف الإجمالي)
 - **Route**: `/variance-analysis/overall`
 - **File**: `VarianceAnalysis.tsx` has a 5th navigation button (not in OBJECTIVES array) that routes there

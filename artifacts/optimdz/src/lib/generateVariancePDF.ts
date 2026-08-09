@@ -36,7 +36,7 @@ export interface VariancePDFOptions {
   totals: VarianceTotals;
   dominantFactor: "price" | "qty" | "var3" | "var4" | "equal";
   analysisLines: { icon: string; text: string; color: string }[];
-  suggestions: { icon: string; title: string; desc: string; color?: string; borderColor?: string }[];
+  suggestions: { icon: string; title?: string; desc: string; color?: string; borderColor?: string }[];
   managerName?: string;
   institutionName?: string;
   onProgress?: (step: string, pct: number) => void;
@@ -383,7 +383,7 @@ function buildAnalysisPage(opts: VariancePDFOptions, totalPages: number) {
     const bdr = twBorder(s.borderColor ?? "border-l-amber-500");
     return `
     <div style="border-left:4px solid ${bdr};padding:8px 12px;background:${bg};border-radius:0 6px 6px 0;margin-bottom:8px;">
-      <div style="font-size:10.5px;font-weight:700;color:${C.text};margin-bottom:3px;">${s.icon} ${s.title}</div>
+       ${s.title ? `<div style="font-size:10.5px;font-weight:700;color:${C.text};margin-bottom:3px;">${s.icon} ${s.title}</div>` : ""}
       <div style="font-size:9.5px;color:${C.muted};line-height:1.65;">${s.desc}</div>
     </div>`;
   }).join("");
