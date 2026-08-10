@@ -190,67 +190,54 @@ export function generateCapacityAnalysis(
   results: CapacityResults,
   periodLabels: string[],
 ): Array<{ fr: string; ar: string }> {
-  const lines: Array<{ fr: string; ar: string }> = [];
-  const { centers, bottleneckCenterCount, overallUtilization, overallStatus } = results;
+  const { centers, overallUtilization, overallStatus } = results;
+  const totalCapacity = centers.reduce(
+    (sum, c) => sum + c.periods.reduce((centerSum, p) => centerSum + p.capacity, 0),
+    0,
+  );
+  const totalLoad = centers.reduce(
+    (sum, c) => sum + c.periods.reduce((centerSum, p) => centerSum + p.load, 0),
+    0,
+  );
+  const totalGap = totalCapacity - totalLoad;
+  const fmt = (value: number) => value.toFixed(1);
 
-  // Overall picture
-  if (overallStatus === "critical") {
-    lines.push({
-      fr: `🔴 Situation critique : ${bottleneckCenterCount} centre(s) de travail sont en surcharge (taux de charge > 100%). Intervention immédiate requise.`,
-      ar: `🔴 وضع حرج: ${bottleneckCenterCount} مركز(مراكز) عمل في وضع الحمل الزائد (معدل التحميل > 100%). التدخل الفوري مطلوب.`,
-    });
-  } else if (overallStatus === "warning") {
-    lines.push({
-      fr: `🟡 Situation tendue : certains centres approchent leur limite de capacité (utilisation globale : ${overallUtilization.toFixed(1)}%). Surveillance accrue recommandée.`,
-      ar: `🟡 وضع متوتر: بعض المراكز تقترب من حد طاقتها (الاستخدام الإجمالي: ${overallUtilization.toFixed(1)}%). يُوصى بمراقبة مكثّفة.`,
-    });
-  } else {
-    lines.push({
-      fr: `✅ Situation saine : tous les centres opèrent dans les limites de leur capacité (utilisation globale : ${overallUtilization.toFixed(1)}%).`,
-      ar: `✅ وضع صحي: جميع المراكز تعمل ضمن حدود طاقتها (الاستخدام الإجمالي: ${overallUtilization.toFixed(1)}%).`,
-    });
-  }
+  const lines: Array<{ fr: string; ar: string }> = [{
+    fr: overallStatus === "critical"
+      ? `Sur l'ensemble de la période planifiée, les centres disposent de ${fmt(totalCapacity)} unités de capacité pour ${fmt(totalLoad)} unités de charge demandée, soit une utilisation globale de ${fmt(overallUtilization)}% et un solde cumulé de ${fmt(totalGap)} unités. Ce solde global masque toutefois une insuffisance à certains moments : le calendrier ne peut pas être exécuté tel quel sans arbitrage entre périodes ou centres.`
+      : overallStatus === "warning"
+        ? `Sur la période planifiée, les centres disposent de ${fmt(totalCapacity)} unités de capacité pour ${fmt(totalLoad)} unités de charge demandée. L'utilisation globale atteint ${fmt(overallUtilization)}% et il reste ${fmt(totalGap)} unités de marge ; le plan est réalisable, mais une variation de la demande peut rapidement tendre les ressources.`
+        : `Sur la période planifiée, les centres disposent de ${fmt(totalCapacity)} unités de capacité pour ${fmt(totalLoad)} unités de charge demandée. L'utilisation globale est de ${fmt(overallUtilization)}% et le solde disponible atteint ${fmt(totalGap)} unités ; le plan peut donc être absorbé dans les ressources prévues.`,
+    ar: overallStatus === "critical"
+      ? `على امتداد فترة التخطيط، تتوفر المراكز على طاقة قدرها ${fmt(totalCapacity)} وحدة مقابل حمل مطلوب قدره ${fmt(totalLoad)} وحدة، أي أن الاستخدام الإجمالي يبلغ ${fmt(overallUtilization)}% والرصيد التراكمي ${fmt(totalGap)} وحدة. لكن هذا الرصيد الإجمالي يخفي نقصاً في بعض اللحظات؛ لذلك لا يمكن تنفيذ الجدول كما هو دون موازنة بين الفترات أو المراكز.`
+      : overallStatus === "warning"
+        ? `خلال فترة التخطيط، تتوفر المراكز على طاقة قدرها ${fmt(totalCapacity)} وحدة مقابل حمل مطلوب قدره ${fmt(totalLoad)} وحدة. ويبلغ الاستخدام الإجمالي ${fmt(overallUtilization)}%، مع هامش متبق قدره ${fmt(totalGap)} وحدة؛ لذلك يمكن تنفيذ الخطة، لكن أي ارتفاع في الطلب قد يضغط بسرعة على الموارد.`
+        : `خلال فترة التخطيط، تتوفر المراكز على طاقة قدرها ${fmt(totalCapacity)} وحدة مقابل حمل مطلوب قدره ${fmt(totalLoad)} وحدة. ويبلغ الاستخدام الإجمالي ${fmt(overallUtilization)}%، مع رصيد متاح قدره ${fmt(totalGap)} وحدة؛ لذلك يمكن استيعاب الخطة ضمن الموارد المبرمجة.`,
+  }];
 
-  // Per bottleneck centre
-  for (const c of centers.filter(c => c.isBottleneck)) {
-    const worstPeriodIdx = c.bottleneckPeriods.reduce(
-      (best, p) => (c.periods[p].utilizationRate > c.periods[best].utilizationRate ? p : best),
-      c.bottleneckPeriods[0],
+  for (const c of centers) {
+    const available = c.periods.reduce((sum, p) => sum + p.capacity, 0);
+    const required = c.periods.reduce((sum, p) => sum + p.load, 0);
+    const gap = available - required;
+    const lowestGapIdx = c.periods.reduce(
+      (best, p, i) => (p.capacityGap < c.periods[best].capacityGap ? i : best),
+      0,
     );
-    const worstP = c.periods[worstPeriodIdx];
-    const rateStr = isFinite(worstP.utilizationRate) ? `${worstP.utilizationRate.toFixed(1)}%` : "∞";
-    lines.push({
-      fr: `🔴 Goulot d'étranglement — "${c.name}" : surcharge sur ${c.bottleneckPeriods.length} période(s). Pire pic : ${periodLabels[worstPeriodIdx]} à ${rateStr} (écart : ${worstP.capacityGap.toFixed(1)} unités).`,
-      ar: `🔴 اختناق — "${c.name}": حمل زائد خلال ${c.bottleneckPeriods.length} فترة(فترات). أسوأ ذروة: ${periodLabels[worstPeriodIdx]} بنسبة ${rateStr} (الفجوة: ${worstP.capacityGap.toFixed(1)} وحدة).`,
-    });
-  }
+    const highestGapIdx = c.periods.reduce(
+      (best, p, i) => (p.capacityGap > c.periods[best].capacityGap ? i : best),
+      0,
+    );
+    const gapPeriodIdx = c.isBottleneck || gap < 0 ? lowestGapIdx : highestGapIdx;
+    const gapPeriod = c.periods[gapPeriodIdx];
+    const gapLabel = periodLabels[gapPeriodIdx];
 
-  // Warning centres (approaching limit)
-  for (const c of centers.filter(c => c.status === "warning")) {
     lines.push({
-      fr: `🟡 "${c.name}" approche la saturation : utilisation moyenne ${c.avgUtilizationRate.toFixed(1)}% — pic à ${c.maxUtilizationRate.toFixed(1)}%.`,
-      ar: `🟡 "${c.name}" يقترب من التشبع: متوسط الاستخدام ${c.avgUtilizationRate.toFixed(1)}% — الذروة ${c.maxUtilizationRate.toFixed(1)}%.`,
-    });
-  }
-
-  // Underused centres
-  const underused = centers.filter(c => c.status === "underused");
-  if (underused.length > 0) {
-    const names = underused.map(c => `"${c.name}" (${c.avgUtilizationRate.toFixed(1)}%)`).join(", ");
-    const namesAr = underused.map(c => `"${c.name}" (${c.avgUtilizationRate.toFixed(1)}%)`).join("، ");
-    lines.push({
-      fr: `📉 Capacité sous-utilisée détectée : ${names}. Ces ressources pourraient absorber la charge des centres surchargés.`,
-      ar: `📉 طاقة غير مستغلة: ${namesAr}. هذه الموارد يمكنها استيعاب حمل المراكز المثقلة.`,
-    });
-  }
-
-  // Good centres
-  const goodCenters = centers.filter(c => c.status === "good");
-  if (goodCenters.length > 0 && goodCenters.length < centers.length) {
-    const names = goodCenters.map(c => `"${c.name}"`).join(", ");
-    lines.push({
-      fr: `✅ Centres équilibrés : ${names} opèrent dans des plages de charge optimales.`,
-      ar: `✅ مراكز متوازنة: ${names} تعمل ضمن نطاقات تحميل مثالية.`,
+      fr: c.isBottleneck
+        ? `Le centre "${c.name}" dispose de ${fmt(available)} unités pour ${fmt(required)} unités demandées, soit une utilisation moyenne de ${fmt(c.avgUtilizationRate)}%. Même si son bilan cumulé laisse ${fmt(Math.max(0, gap))} unité(s) de marge, il présente un déficit ponctuel en ${gapLabel} : ${fmt(gapPeriod.capacity)} unités disponibles ne couvrent que ${fmt(gapPeriod.load)} unités de charge, laissant ${fmt(Math.abs(gapPeriod.capacityGap))} unités à absorber.`
+        : `Le centre "${c.name}" dispose de ${fmt(available)} unités pour ${fmt(required)} unités demandées, soit une utilisation moyenne de ${fmt(c.avgUtilizationRate)}% et un surplus cumulé de ${fmt(gap)} unités. Sur la période la plus favorable, ${fmt(gapPeriod.capacity)} unités disponibles couvrent ${fmt(gapPeriod.load)} unités de charge et laissent ${fmt(gapPeriod.capacityGap)} unités mobilisables pour absorber une demande supplémentaire ou soulager un autre centre.`,
+      ar: c.isBottleneck
+        ? `يتوفر مركز "${c.name}" على ${fmt(available)} وحدة مقابل حمل مطلوب قدره ${fmt(required)} وحدة، أي بمعدل استخدام متوسط قدره ${fmt(c.avgUtilizationRate)}%. ورغم أن رصيده التراكمي يترك هامشاً قدره ${fmt(Math.max(0, gap))} وحدة، فإنه يسجل عجزاً مؤقتاً في ${gapLabel}: لا تغطي الطاقة المتاحة البالغة ${fmt(gapPeriod.capacity)} وحدة سوى حملاً قدره ${fmt(gapPeriod.load)} وحدة، فتتبقى فجوة قدرها ${fmt(Math.abs(gapPeriod.capacityGap))} وحدة يجب استيعابها.`
+        : `يتوفر مركز "${c.name}" على ${fmt(available)} وحدة مقابل حمل مطلوب قدره ${fmt(required)} وحدة، أي بمعدل استخدام متوسط قدره ${fmt(c.avgUtilizationRate)}% وفائض تراكمي قدره ${fmt(gap)} وحدة. وفي أكثر الفترات ملاءمة، تغطي الطاقة المتاحة البالغة ${fmt(gapPeriod.capacity)} وحدة حملاً قدره ${fmt(gapPeriod.load)} وحدة، وتترك ${fmt(gapPeriod.capacityGap)} وحدة يمكن استخدامها لاستيعاب طلب إضافي أو تخفيف الضغط عن مركز آخر.`,
     });
   }
 
@@ -264,25 +251,29 @@ export function generateCapacityRecommendations(
 ): Array<{ icon: string; fr: string; ar: string; descFr: string; descAr: string }> {
   const recos: Array<{ icon: string; fr: string; ar: string; descFr: string; descAr: string }> = [];
   const { centers, bottleneckCenterCount, overallStatus } = results;
+  const formatRate = (value: number) => (isFinite(value) ? `${value.toFixed(1)}%` : "sans capacité disponible");
 
   const bottlenecks = centers.filter(c => c.isBottleneck);
   const underused   = centers.filter(c => c.status === "underused");
   const warnings    = centers.filter(c => c.status === "warning");
 
   if (bottleneckCenterCount === 0 && overallStatus === "good") {
+    const totalCapacity = centers.reduce((sum, c) => sum + c.periods.reduce((s, p) => s + p.capacity, 0), 0);
+    const totalLoad = centers.reduce((sum, c) => sum + c.periods.reduce((s, p) => s + p.load, 0), 0);
+    const totalGap = totalCapacity - totalLoad;
     recos.push({
       icon: "✅",
       fr: "Maintenir l'équilibre actuel de la charge",
       ar: "الحفاظ على توازن الحمل الحالي",
-      descFr: "Tous les centres opèrent dans des plages saines. Continuez à surveiller la charge à chaque nouvelle période pour détecter toute dérive précoce.",
-      descAr: "جميع المراكز تعمل ضمن نطاقات صحية. استمر في مراقبة الحمل مع كل فترة جديدة للكشف المبكر عن أي انحراف.",
+      descFr: `Le plan laisse ${totalGap.toFixed(1)} unités de capacité disponible après couverture de ${totalLoad.toFixed(1)} unités de charge sur ${totalCapacity.toFixed(1)} unités. Conservez la répartition actuelle et vérifiez ces marges à chaque nouvelle période.`,
+      descAr: `تترك الخطة ${totalGap.toFixed(1)} وحدة من الطاقة بعد تغطية حمل قدره ${totalLoad.toFixed(1)} وحدة من أصل ${totalCapacity.toFixed(1)} وحدة متاحة. حافظ على التوزيع الحالي وراجع هذه الهوامش مع كل فترة جديدة.`,
     });
     recos.push({
       icon: "📋",
       fr: "Mettre à jour le plan à chaque révision de la demande",
       ar: "تحديث الخطة مع كل مراجعة للطلب",
-      descFr: "La demande évolue à chaque période. Réactualisez les charges prévisionnelles dès qu'une commande importante est confirmée ou annulée.",
-      descAr: "يتغيّر الطلب مع كل فترة. حدّث الأحمال التنبؤية فور تأكيد أو إلغاء طلب مهم.",
+      descFr: "Réactualisez les charges dès qu'une commande importante est confirmée ou annulée afin de préserver le niveau de service sans laisser la marge disponible se réduire silencieusement.",
+      descAr: "حدّث الأحمال فور تأكيد أو إلغاء طلب مهم للحفاظ على مستوى الخدمة ومنع تقلص الطاقة المتاحة دون ملاحظة.",
     });
     return recos;
   }
@@ -293,15 +284,16 @@ export function generateCapacityRecommendations(
       (best, p) => c.periods[p].utilizationRate > c.periods[best].utilizationRate ? p : best,
       c.bottleneckPeriods[0],
     );
-    const excess = Math.abs(c.periods[maxPIdx].capacityGap).toFixed(1);
+    const peak = c.periods[maxPIdx];
+    const excess = Math.abs(peak.capacityGap).toFixed(1);
     const periodLabel = periodLabels[maxPIdx];
 
     recos.push({
       icon: "🚨",
-      fr: `Éliminer le goulot sur "${c.name}"`,
-      ar: `إزالة الاختناق في "${c.name}"`,
-      descFr: `Ce centre est surchargé sur ${c.bottleneckPeriods.length} période(s). Déficit de capacité maximal : ${excess} unités en ${periodLabel}. Options immédiates : heures supplémentaires, sous-traitance, ou rééquilibrage de la charge vers un centre disponible.`,
-      descAr: `هذا المركز مثقل على مدى ${c.bottleneckPeriods.length} فترة(فترات). أقصى عجز في الطاقة: ${excess} وحدة في ${periodLabel}. خيارات فورية: ساعات إضافية، مناولة خارجية، أو إعادة توزيع الحمل على مركز متاح.`,
+      fr: `Sécuriser la capacité du centre "${c.name}"`,
+      ar: `تأمين طاقة المركز "${c.name}"`,
+      descFr: `En ${periodLabel}, ${peak.capacity.toFixed(1)} unités disponibles doivent absorber ${peak.load.toFixed(1)} unités de charge, soit ${formatRate(peak.utilizationRate)} d'utilisation et ${excess} unités manquantes. Pour tenir le planning, programmez des heures supplémentaires, sous-traitez ce volume ou replanifiez une partie de la charge vers un centre disposant d'une marge.`,
+      descAr: `في ${periodLabel}، يجب أن تغطي طاقة متاحة قدرها ${peak.capacity.toFixed(1)} وحدة حملاً قدره ${peak.load.toFixed(1)} وحدة، أي استخداماً بنسبة ${formatRate(peak.utilizationRate)} وفجوة قدرها ${excess} وحدة. للحفاظ على الخطة، برمج ساعات إضافية أو أسند هذا الحجم إلى طرف خارجي أو أعد جدولة جزء من الحمل نحو مركز لديه هامش.`,
     });
   }
 
@@ -313,10 +305,10 @@ export function generateCapacityRecommendations(
     const toNamesAr   = underused.map(c => `"${c.name}" (${c.avgUtilizationRate.toFixed(1)}%)`).join("، ");
     recos.push({
       icon: "⚖️",
-      fr: "Transférer la charge vers les centres sous-utilisés",
+      fr: "Rééquilibrer la charge entre les centres",
       ar: "نقل الحمل إلى المراكز ذات الطاقة الفائضة",
-      descFr: `Les centres surchargés (${fromNames}) peuvent décharger une partie de leur charge vers les centres sous-utilisés (${toNames}), qui disposent de capacité disponible immédiate.`,
-      descAr: `المراكز المثقلة (${fromNamesAr}) يمكنها تحويل جزء من حملها إلى المراكز ذات الطاقة الفائضة (${toNamesAr}) التي لديها طاقة متاحة فورية.`,
+      descFr: `Les centres surchargés (${fromNames}) peuvent transférer une partie de leur charge vers ${toNames}. Cette réaffectation utilise une marge déjà disponible et réduit le recours aux heures supplémentaires ou à la sous-traitance.`,
+      descAr: `يمكن للمراكز المثقلة (${fromNamesAr}) تحويل جزء من حملها إلى ${toNamesAr}. ويستفيد هذا التوزيع من طاقة متاحة مسبقاً ويقلل الحاجة إلى الساعات الإضافية أو المناولة الخارجية.`,
     });
   }
 
@@ -326,10 +318,10 @@ export function generateCapacityRecommendations(
     const namesAr = warnings.map(c => `"${c.name}" (${c.maxUtilizationRate.toFixed(1)}%)`).join("، ");
     recos.push({
       icon: "⚠️",
-      fr: "Surveiller les centres en tension avant saturation",
+      fr: "Préparer la prochaine hausse de charge",
       ar: "مراقبة المراكز المتوترة قبل الوصول إلى التشبع",
-      descFr: `Les centres suivants approchent leur limite de capacité et risquent de devenir des goulots dans les prochaines périodes : ${names}. Planifiez des mesures préventives dès maintenant.`,
-      descAr: `المراكز التالية تقترب من حد طاقتها وقد تصبح اختناقات في الفترات القادمة: ${namesAr}. خطّط لتدابير وقائية الآن.`,
+      descFr: `Les centres ${names} atteignent déjà leur période de charge maximale. Réservez dès maintenant une solution de débordement, comme un créneau supplémentaire ou une ressource de secours, avant que la demande ne dépasse leur capacité.`,
+      descAr: `تقترب المراكز ${namesAr} من أعلى حمل لها. احجز من الآن حلاً احتياطياً، مثل فترة إضافية أو مورد بديل، قبل أن يتجاوز الطلب طاقتها.`,
     });
   }
 
@@ -339,10 +331,10 @@ export function generateCapacityRecommendations(
     const namesAr = underused.map(c => `"${c.name}"`).join("، ");
     recos.push({
       icon: "📉",
-      fr: "Réaffecter ou réduire la capacité des centres sous-chargés",
+      fr: "Valoriser la marge des centres sous-utilisés",
       ar: "إعادة تخصيص طاقة المراكز المحملة بأقل من طاقتها",
-      descFr: `Les centres ${names} sont nettement sous-utilisés. Envisagez de leur affecter des charges supplémentaires, de réduire temporairement leur capacité disponible, ou de redéployer leurs ressources vers d'autres activités.`,
-      descAr: `المراكز ${namesAr} تعمل بأقل بكثير من طاقتها. فكر في تخصيص أحمال إضافية لها، أو تقليص طاقتها المتاحة مؤقتاً، أو إعادة توجيه مواردها نحو أنشطة أخرى.`,
+      descFr: `Les centres ${names} disposent d'une marge importante. Affectez-leur en priorité les nouvelles commandes compatibles ou redéployez une partie de leurs ressources afin d'éviter de maintenir une capacité inutilisée.`,
+      descAr: `تملك المراكز ${namesAr} هامشاً مهماً. وجّه إليها الطلبات الجديدة المتوافقة أولاً أو أعد توزيع جزء من مواردها لتجنب إبقاء طاقة غير مستغلة.`,
     });
   }
 
@@ -351,8 +343,8 @@ export function generateCapacityRecommendations(
     icon: "🔄",
     fr: "Réviser le plan de charge à chaque changement de demande",
     ar: "مراجعة خطة التحميل مع كل تغيير في الطلب",
-    descFr: "La demande client évolue constamment. Recalculez les taux de charge à chaque nouvelle commande confirmée pour anticiper les goulots avant qu'ils n'impactent la production.",
-    descAr: "طلب العملاء يتغيّر باستمرار. أعد حساب معدلات التحميل مع كل طلب جديد مؤكد لتوقع الاختناقات قبل أن تؤثر على الإنتاج.",
+    descFr: "Recalculez le plan après chaque commande confirmée ou modification de délai afin de détecter une future insuffisance avant qu'elle ne se transforme en retard de production.",
+    descAr: "أعد حساب الخطة بعد كل طلب مؤكد أو تغيير في الموعد لاكتشاف أي نقص قادم قبل أن يتحول إلى تأخير في الإنتاج.",
   });
 
   return recos;
