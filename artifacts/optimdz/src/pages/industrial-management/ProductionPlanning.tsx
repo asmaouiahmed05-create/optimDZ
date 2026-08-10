@@ -832,11 +832,11 @@ export default function ProductionPlanning() {
                   {t("Analyse de la Situation", "تحليل الوضع")}
                 </CardTitle>
               </CardHeader>
-              <CardContent className="space-y-2">
+              <CardContent className="space-y-3">
                 {generateMrpAnalysis(results).map((line, i) => (
-                  <div key={i} className="bg-primary/5 border border-primary/15 rounded-lg px-4 py-3 text-sm leading-relaxed">
+                  <p key={i} className="bg-primary/5 border border-primary/15 rounded-lg px-4 py-3 text-sm leading-relaxed">
                     {t(line.fr, line.ar)}
-                  </div>
+                  </p>
                 ))}
               </CardContent>
             </Card>
