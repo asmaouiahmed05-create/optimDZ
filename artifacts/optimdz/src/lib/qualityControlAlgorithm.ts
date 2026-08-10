@@ -321,100 +321,98 @@ export function generateQualityAnalysis(
 
   if (results.chartType === "xbar") {
     const r = results as XbarResults;
+    const outPoints = r.samples.filter(s => s.isOutOfControl);
+    const pointDetailsFr = outPoints.map(s =>
+      s.outDirection === "above"
+        ? `"${s.label}" affiche une moyenne de ${s.sampleMean.toFixed(3)}, au-dessus de la limite supérieure ${s.ucl.toFixed(3)}`
+        : `"${s.label}" affiche une moyenne de ${s.sampleMean.toFixed(3)}, en dessous de la limite inférieure ${s.lcl.toFixed(3)}`
+    ).join("; ");
+    const pointDetailsAr = outPoints.map(s =>
+      s.outDirection === "above"
+        ? `العينة "${s.label}" تسجل متوسطاً قدره ${s.sampleMean.toFixed(3)}، أعلى من الحد العلوي ${s.ucl.toFixed(3)}`
+        : `العينة "${s.label}" تسجل متوسطاً قدره ${s.sampleMean.toFixed(3)}، أدنى من الحد السفلي ${s.lcl.toFixed(3)}`
+    ).join("؛ ");
 
-    // Overall status
-    if (r.processStatus === "in-control") {
+    lines.push({
+      fr: r.processStatus === "in-control"
+        ? `Le processus est sous contrôle sur les ${r.samples.length} échantillons : toutes les moyennes restent entre ${r.lcl.toFixed(3)} et ${r.ucl.toFixed(3)}. La moyenne générale de ${r.grandMean.toFixed(3)} et l'écart-type de ${r.processStdDev.toFixed(3)} décrivent un procédé stable pour la période observée.`
+        : `Le processus présente une dérive sur ${r.outOfControlCount} échantillon(s) parmi ${r.samples.length}. La moyenne générale est de ${r.grandMean.toFixed(3)} et les limites observées vont de ${r.lcl.toFixed(3)} à ${r.ucl.toFixed(3)} ; ce signal indique qu'une cause particulière a probablement perturbé le procédé.`,
+      ar: r.processStatus === "in-control"
+        ? `العملية تحت السيطرة في العينات الـ${r.samples.length}؛ فجميع المتوسطات تقع بين ${r.lcl.toFixed(3)} و${r.ucl.toFixed(3)}. ويصف المتوسط العام البالغ ${r.grandMean.toFixed(3)} والانحراف المعياري البالغ ${r.processStdDev.toFixed(3)} عملية مستقرة خلال الفترة الملاحظة.`
+        : `تظهر العملية انحرافاً في ${r.outOfControlCount} عينة من أصل ${r.samples.length}. يبلغ المتوسط العام ${r.grandMean.toFixed(3)}، وتمتد الحدود المرصودة من ${r.lcl.toFixed(3)} إلى ${r.ucl.toFixed(3)}؛ وتشير هذه الإشارة إلى سبب خاص أثّر في العملية.`,
+    });
+
+    if (outPoints.length > 0) {
       lines.push({
-        fr: `✅ Processus sous contrôle : tous les ${r.samples.length} échantillons sont dans les limites de contrôle (X̿ = ${r.grandMean.toFixed(3)}, σ = ${r.processStdDev.toFixed(3)}).`,
-        ar: `✅ العملية تحت السيطرة: جميع العينات الـ ${r.samples.length} ضمن حدود المراقبة (X̿ = ${r.grandMean.toFixed(3)}، σ = ${r.processStdDev.toFixed(3)}).`,
+        fr: `Les points concernés sont ${pointDetailsFr}. En pratique, un point au-dessus de la limite traduit une production momentanément trop élevée, tandis qu'un point en dessous traduit une baisse inhabituelle ; ces écarts peuvent signaler un réglage machine, une matière, un outil ou une méthode différente.`,
+        ar: `النقاط المعنية هي: ${pointDetailsAr}. عملياً، يشير تجاوز الحد العلوي إلى إنتاج أعلى من المستوى المعتاد مؤقتاً، بينما يشير النزول تحت الحد السفلي إلى انخفاض غير معتاد؛ وقد تكشف هذه الانحرافات ضبطاً مختلفاً للآلة أو مادة أو أداة أو طريقة عمل مختلفة.`,
+      });
+      lines.push({
+        fr: `Pour sécuriser la production, isolez les lots associés aux points hors limites, vérifiez l'étalonnage et le réglage au moment du prélèvement, puis comparez l'opérateur, la machine et la matière utilisés. La correction doit être confirmée par un nouvel échantillon avant de revenir à la cadence normale.`,
+        ar: `لتأمين الإنتاج، اعزل الدفعات المرتبطة بالنقاط الخارجة عن الحدود، وتحقق من معايرة وضبط الآلة وقت أخذ العينة، ثم قارن المشغل والآلة والمادة المستخدمة. ويجب تأكيد التصحيح بعينة جديدة قبل العودة إلى وتيرة الإنتاج العادية.`,
       });
     } else {
       lines.push({
-        fr: `🔴 Processus hors contrôle : ${r.outOfControlCount} échantillon(s) sur ${r.samples.length} sont hors des limites de contrôle (UCL = ${r.ucl.toFixed(3)}, LCL = ${r.lcl.toFixed(3)}).`,
-        ar: `🔴 العملية خارج السيطرة: ${r.outOfControlCount} عينة(عينات) من أصل ${r.samples.length} خارج حدود المراقبة (UCL = ${r.ucl.toFixed(3)}، LCL = ${r.lcl.toFixed(3)}).`,
+        fr: `La dispersion mesurée est de ${r.processStdDev.toFixed(3)} pour une taille moyenne de ${r.avgSampleSize.toFixed(1)} mesure(s) par échantillon ; l'écart entre les deux limites est de ${(r.ucl - r.lcl).toFixed(3)} unité(s). Le procédé est suffisamment régulier pour poursuivre la surveillance, tout en recherchant progressivement une réduction de la variabilité.`,
+        ar: `يبلغ تشتت القياسات ${r.processStdDev.toFixed(3)} مع متوسط حجم قدره ${r.avgSampleSize.toFixed(1)} قياس لكل عينة؛ ويبلغ الفرق بين الحدين ${(r.ucl - r.lcl).toFixed(3)} وحدة. لذلك تبدو العملية منتظمة بما يكفي لمواصلة المراقبة، مع السعي تدريجياً إلى تقليل التباين.`,
       });
     }
 
-    // Per out-of-control sample
-    for (const s of r.samples.filter(s => s.isOutOfControl)) {
-      if (s.outDirection === "above") {
-        lines.push({
-          fr: `🔴 "${s.label}" hors contrôle — au-dessus de l'UCL : moyenne = ${s.sampleMean.toFixed(3)} > UCL = ${s.ucl.toFixed(3)}. Variation excessive vers le haut détectée.`,
-          ar: `🔴 "${s.label}" خارج السيطرة — أعلى من UCL: المتوسط = ${s.sampleMean.toFixed(3)} > UCL = ${s.ucl.toFixed(3)}. انحراف مفرط نحو الأعلى مكتشف.`,
-        });
-      } else {
-        lines.push({
-          fr: `🔵 "${s.label}" hors contrôle — au-dessous de la LCL : moyenne = ${s.sampleMean.toFixed(3)} < LCL = ${s.lcl.toFixed(3)}. Variation anormalement basse détectée.`,
-          ar: `🔵 "${s.label}" خارج السيطرة — أدنى من LCL: المتوسط = ${s.sampleMean.toFixed(3)} < LCL = ${s.lcl.toFixed(3)}. انحراف غير طبيعي نحو الأسفل مكتشف.`,
-        });
-      }
-    }
-
-    // Target mean comparison
     if (r.targetMean !== null) {
       const diff = Math.abs(r.grandMean - r.targetMean);
-      const pct  = r.processStdDev > 0 ? (diff / r.processStdDev * 100).toFixed(1) : "—";
-      if (diff < 0.001) {
-        lines.push({
-          fr: `🎯 La moyenne générale (${r.grandMean.toFixed(3)}) est parfaitement alignée avec la valeur cible (${r.targetMean}).`,
-          ar: `🎯 المتوسط العام (${r.grandMean.toFixed(3)}) متوافق تماماً مع القيمة المرجعية (${r.targetMean}).`,
-        });
-      } else if (r.grandMean > r.targetMean) {
-        lines.push({
-          fr: `🎯 Dérive positive : la moyenne générale (${r.grandMean.toFixed(3)}) dépasse la cible (${r.targetMean}) de ${diff.toFixed(3)} — soit ${pct}% de σ. Le processus produit systématiquement au-dessus de la cible.`,
-          ar: `🎯 انجراف موجب: المتوسط العام (${r.grandMean.toFixed(3)}) يتجاوز الهدف (${r.targetMean}) بمقدار ${diff.toFixed(3)} — أي ${pct}% من σ. العملية تنتج بشكل منتظم أعلى من الهدف.`,
-        });
-      } else {
-        lines.push({
-          fr: `🎯 Dérive négative : la moyenne générale (${r.grandMean.toFixed(3)}) est en dessous de la cible (${r.targetMean}) de ${diff.toFixed(3)} — soit ${pct}% de σ. Le processus produit systématiquement en dessous de la cible.`,
-          ar: `🎯 انجراف سلبي: المتوسط العام (${r.grandMean.toFixed(3)}) أقل من الهدف (${r.targetMean}) بمقدار ${diff.toFixed(3)} — أي ${pct}% من σ. العملية تنتج بشكل منتظم أدنى من الهدف.`,
-        });
-      }
+      lines.push({
+        fr: diff < 0.001
+          ? `La moyenne générale de ${r.grandMean.toFixed(3)} est alignée sur la cible de ${r.targetMean.toFixed(3)}, ce qui confirme que le centrage du procédé correspond à l'objectif défini.`
+          : `La moyenne générale de ${r.grandMean.toFixed(3)} s'écarte de la cible ${r.targetMean.toFixed(3)} de ${diff.toFixed(3)} unité(s). Même si les points restent dans les limites, ce décalage mérite un ajustement du réglage pour rapprocher la production du niveau attendu.`,
+        ar: diff < 0.001
+          ? `المتوسط العام ${r.grandMean.toFixed(3)} منسجم مع القيمة المستهدفة ${r.targetMean.toFixed(3)}، مما يؤكد أن تمركز العملية يطابق الهدف المحدد.`
+          : `ينحرف المتوسط العام ${r.grandMean.toFixed(3)} عن الهدف ${r.targetMean.toFixed(3)} بمقدار ${diff.toFixed(3)} وحدة. وحتى إذا بقيت النقاط داخل الحدود، فإن هذا الفرق يستحق تعديل الضبط لتقريب الإنتاج من المستوى المتوقع.`,
+      });
     }
-
-    // σ interpretation
-    lines.push({
-      fr: `📊 Dispersion du processus : σ = ${r.processStdDev.toFixed(3)} (taille moyenne des échantillons : ${r.avgSampleSize.toFixed(1)} mesures). L'intervalle de contrôle ±3σ couvre ${((r.ucl - r.lcl)).toFixed(3)} unités.`,
-      ar: `📊 تشتت العملية: σ = ${r.processStdDev.toFixed(3)} (متوسط حجم العينة: ${r.avgSampleSize.toFixed(1)} قياسات). نطاق السيطرة ±3σ يغطي ${(r.ucl - r.lcl).toFixed(3)} وحدة.`,
-    });
 
   } else {
     const r = results as PResults;
     const pPct = (r.pBar * 100).toFixed(2);
+    const outPoints = r.samples.filter(s => s.isOutOfControl);
+    const pointDetailsFr = outPoints.map(s =>
+      s.outDirection === "above"
+        ? `"${s.label}" présente ${s.d} défaut(s) sur ${s.n} unité(s), soit ${(s.rate * 100).toFixed(2)} %, au-dessus de la limite ${(
+          s.ucl * 100
+        ).toFixed(2)} %`
+        : `"${s.label}" présente ${s.d} défaut(s) sur ${s.n} unité(s), soit ${(s.rate * 100).toFixed(2)} %, en dessous de la limite ${(
+          s.lcl * 100
+        ).toFixed(2)} %`
+    ).join("; ");
+    const pointDetailsAr = outPoints.map(s =>
+      s.outDirection === "above"
+        ? `"${s.label}" تسجل ${s.d} عيب من أصل ${s.n} وحدة، أي ${(s.rate * 100).toFixed(2)}%، أعلى من الحد ${(s.ucl * 100).toFixed(2)}%`
+        : `"${s.label}" تسجل ${s.d} عيب من أصل ${s.n} وحدة، أي ${(s.rate * 100).toFixed(2)}%، أدنى من الحد ${(s.lcl * 100).toFixed(2)}%`
+    ).join("؛ ");
 
-    if (r.processStatus === "in-control") {
+    lines.push({
+      fr: r.processStatus === "in-control"
+        ? `Le processus de conformité est sous contrôle : les ${r.samples.length} échantillons restent dans leurs limites, avec ${r.totalDefects} défaut(s) sur ${r.totalInspected} unité(s) inspectée(s), soit un taux moyen de ${pPct} %. La situation est stable pour la période et ne montre pas de cause particulière nécessitant une intervention immédiate.`
+        : `Le processus de conformité est hors contrôle : ${r.outOfControlCount} échantillon(s) sur ${r.samples.length} dépassent les limites. Sur ${r.totalInspected} unité(s) inspectée(s), ${r.totalDefects} défaut(s) ont été relevés, soit un taux moyen de ${pPct} % ; la qualité n'est donc pas homogène sur toute la période.`,
+      ar: r.processStatus === "in-control"
+        ? `عملية المطابقة تحت السيطرة؛ فالعينات الـ${r.samples.length} تبقى داخل حدودها، مع تسجيل ${r.totalDefects} عيب من أصل ${r.totalInspected} وحدة مفحوصة، أي معدل متوسط قدره ${pPct}%. الوضع مستقر خلال الفترة ولا يظهر سبباً خاصاً يستدعي تدخلاً فورياً.`
+        : `عملية المطابقة خارج السيطرة؛ إذ تتجاوز ${r.outOfControlCount} عينة من أصل ${r.samples.length} الحدود. ومن أصل ${r.totalInspected} وحدة مفحوصة، سُجل ${r.totalDefects} عيب، أي معدل متوسط قدره ${pPct}%؛ وهذا يعني أن الجودة ليست متجانسة طوال الفترة.`,
+    });
+
+    if (outPoints.length > 0) {
       lines.push({
-        fr: `✅ Processus sous contrôle : tous les ${r.samples.length} échantillons respectent les limites de contrôle. Taux moyen de défauts p̄ = ${pPct}%.`,
-        ar: `✅ العملية تحت السيطرة: جميع العينات الـ ${r.samples.length} ضمن حدود المراقبة. متوسط معدل العيوب p̄ = ${pPct}%.`,
+        fr: `Les points concernés sont ${pointDetailsFr}. Un taux supérieur à sa limite signale un pic de non-conformités à relier au lot, à l'équipe, à la machine ou à la matière ; un taux inférieur doit être vérifié pour confirmer qu'il provient bien d'une amélioration et non d'un changement de contrôle ou d'une erreur de saisie.`,
+        ar: `النقاط المعنية هي: ${pointDetailsAr}. ويشير المعدل الأعلى من حده إلى ذروة في عدم المطابقة يجب ربطها بالدفعة أو الفريق أو الآلة أو المادة؛ أما المعدل الأدنى فيجب التحقق منه للتأكد من أنه تحسن حقيقي وليس نتيجة تغيير في الفحص أو خطأ في الإدخال.`,
+      });
+      lines.push({
+        fr: `La mesure corrective prioritaire consiste à isoler les lots liés aux points signalés, vérifier les enregistrements de production et lancer une recherche de cause avec l'équipe qualité. Après correction, reprenez un échantillon comparable pour confirmer que le taux revient dans les limites avant de libérer les lots concernés.`,
+        ar: `يتمثل الإجراء التصحيحي الأول في عزل الدفعات المرتبطة بالنقاط المشار إليها، ومراجعة سجلات الإنتاج، وبدء بحث عن السبب مع فريق الجودة. وبعد التصحيح، أعد فحص عينة مماثلة للتأكد من عودة المعدل إلى الحدود قبل تحرير الدفعات المعنية.`,
       });
     } else {
       lines.push({
-        fr: `🔴 Processus hors contrôle : ${r.outOfControlCount} échantillon(s) dépassent les limites. Taux moyen p̄ = ${pPct}% (total : ${r.totalDefects} défauts sur ${r.totalInspected} unités inspectées).`,
-        ar: `🔴 العملية خارج السيطرة: ${r.outOfControlCount} عينة(عينات) تتجاوز حدود المراقبة. معدل p̄ = ${pPct}% (الإجمالي: ${r.totalDefects} عيب من أصل ${r.totalInspected} وحدة مفحوصة).`,
+        fr: `Le taux moyen de ${pPct} % repose sur des lots de taille moyenne de ${r.avgN.toFixed(1)} unité(s), avec des limites de référence comprises entre ${(r.lclConstant * 100).toFixed(2)} % et ${(r.uclConstant * 100).toFixed(2)} %. Le niveau est maîtrisé sur la période ; conservez la même discipline de contrôle pour détecter rapidement une future dérive.`,
+        ar: `يعتمد المعدل المتوسط البالغ ${pPct}% على دفعات بمتوسط حجم ${r.avgN.toFixed(1)} وحدة، مع حدود مرجعية بين ${(r.lclConstant * 100).toFixed(2)}% و${(r.uclConstant * 100).toFixed(2)}%. المستوى مضبوط خلال الفترة؛ فحافظ على نفس انضباط الفحص لاكتشاف أي انحراف مستقبلي بسرعة.`,
       });
     }
-
-    for (const s of r.samples.filter(s => s.isOutOfControl)) {
-      const sPct = (s.rate * 100).toFixed(2);
-      const uclPct = (s.ucl * 100).toFixed(2);
-      const lclPct = (s.lcl * 100).toFixed(2);
-      if (s.outDirection === "above") {
-        lines.push({
-          fr: `🔴 "${s.label}" hors contrôle — taux de défauts élevé : p = ${sPct}% > UCL = ${uclPct}% (${s.d} défauts sur ${s.n} unités). Cause assignable probable.`,
-          ar: `🔴 "${s.label}" خارج السيطرة — معدل عيوب مرتفع: p = ${sPct}% > UCL = ${uclPct}% (${s.d} عيب من أصل ${s.n} وحدة). يُرجَّح وجود سبب مُحدَّد.`,
-        });
-      } else {
-        lines.push({
-          fr: `🟢 "${s.label}" hors contrôle — taux anormalement bas : p = ${sPct}% < LCL = ${lclPct}%. Ce résultat exceptionnel mérite investigation (meilleure méthode ? données correctes ?).`,
-          ar: `🟢 "${s.label}" خارج السيطرة — معدل منخفض بشكل غير عادي: p = ${sPct}% < LCL = ${lclPct}%. هذه النتيجة الاستثنائية تستحق التحقيق (طريقة أفضل؟ بيانات صحيحة؟).`,
-        });
-      }
-    }
-
-    lines.push({
-      fr: `📊 Total inspecté : ${r.totalInspected} unités · Total défauts : ${r.totalDefects} · p̄ = ${pPct}% · Taille moyenne des échantillons : ${r.avgN.toFixed(1)} unités.`,
-      ar: `📊 إجمالي الفحص: ${r.totalInspected} وحدة · إجمالي العيوب: ${r.totalDefects} · p̄ = ${pPct}% · متوسط حجم العينة: ${r.avgN.toFixed(1)} وحدة.`,
-    });
   }
 
   return lines;

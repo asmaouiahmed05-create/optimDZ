@@ -1075,11 +1075,11 @@ export default function QualityControl() {
                   {t("Analyse de la Situation", "تحليل الوضع")}
                 </CardTitle>
               </CardHeader>
-              <CardContent className="space-y-2">
+              <CardContent className="space-y-3">
                 {analysisLines.map((line, i) => (
-                  <div key={i} className="p-3 rounded-lg bg-primary/5 border border-primary/15 text-sm text-foreground leading-relaxed">
+                  <p key={i} className="p-3 rounded-lg bg-primary/5 border border-primary/15 text-sm text-foreground leading-relaxed">
                     {isAr ? line.ar : line.fr}
-                  </div>
+                  </p>
                 ))}
               </CardContent>
             </Card>
