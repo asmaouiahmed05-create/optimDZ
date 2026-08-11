@@ -187,42 +187,66 @@ export default function SupplierSelection() {
   // ── Analysis text ─────────────────────────────────────────────────────────────
   function buildAnalysisLines(): string[] {
     if (!analysis || !results) return [];
-    const lines: string[] = [];
-    const top     = analysis.topSupplier;
-    const runner  = analysis.runnerUp;
+    const top = analysis.topSupplier;
+    const runner = analysis.runnerUp;
     const driving = analysis.drivingCriterion;
+    const supplierName = (result: SupplierResult) =>
+      result.name || t(`fournisseur ${result.rank}`, `المورد ${result.rank}`);
+    const ranking = results
+      .map(result => `${supplierName(result)} (${fNum(result.totalScore, 1)} points)`)
+      .join(", ");
+    const criterionWeights = criteria
+      .map(c => `${c.name || t("critère", "المعيار")} (${fNum(c.weight, 1)} %)`)
+      .join(", ");
+    const contributionSummary = (result: SupplierResult) => criteria
+      .map(c => `${c.name || t("critère", "المعيار")} : ${fNum(result.weightedScores[c.id] ?? 0, 1)} ${t("points pondérés", "نقطة مرجّحة")}`)
+      .join(", ");
+    const topStrengths = [...criteria]
+      .sort((a, b) => (top.weightedScores[b.id] ?? 0) - (top.weightedScores[a.id] ?? 0))
+      .slice(0, 2)
+      .map(c => `${c.name || t("critère", "المعيار")} (${fNum(top.scores[c.id] ?? 0, 1)} ${t("sur", "من")} ${scale}, ${fNum(top.weightedScores[c.id] ?? 0, 1)} ${t("points apportés", "نقطة مساهمة")})`)
+      .join(t(" et ", " و"));
 
-    lines.push(t(
-      `L'évaluation porte sur ${results.length} fournisseur(s) avec ${criteria.length} critère(s). Le fournisseur le mieux classé est "${top.name}" avec un score pondéré de ${fNum(top.totalScore, 1)} / 100.`,
-      `التقييم يشمل ${results.length} مورد (موردين) و ${criteria.length} معيار (معايير). أفضل مورد هو "${top.name}" بنقطة مرجّحة ${fNum(top.totalScore, 1)} / 100.`
-    ));
+    const lines: string[] = [
+      t(
+        `L'évaluation compare ${results.length} fournisseurs selon ${criteria.length} critères. Les poids retenus sont ${criterionWeights}. Le classement final est : ${ranking}. "${supplierName(top)}" arrive donc en tête avec ${fNum(top.totalScore, 1)} points sur 100. Sa position s'explique surtout par ses meilleures contributions sur ${topStrengths}, tandis que le critère le plus déterminant pour la décision est "${driving.name}" avec un poids de ${fNum(driving.weight, 1)} %.`,
+        `يقارن التقييم بين ${results.length} موردين وفق ${criteria.length} معايير. الأوزان المعتمدة هي ${criterionWeights}. الترتيب النهائي هو: ${ranking}. لذلك يتصدر "${supplierName(top)}" بنتيجة ${fNum(top.totalScore, 1)} نقطة من 100. ويعود تقدمه أساساً إلى مساهماته الأقوى في ${topStrengths}، بينما يبقى "${driving.name}" المعيار الأكثر تأثيراً بوزن ${fNum(driving.weight, 1)}%.`
+      ),
+      ...results.map(result => t(
+        `Pour "${supplierName(result)}", le score final de ${fNum(result.totalScore, 1)} points se compose de ${contributionSummary(result)}. Cette lecture montre précisément quelles performances soutiennent ou limitent sa position dans le classement.`,
+        `بالنسبة إلى "${supplierName(result)}"، تتكون النتيجة النهائية البالغة ${fNum(result.totalScore, 1)} نقطة من ${contributionSummary(result)}. يوضح هذا التفصيل الأداء الذي يدعم مركزه أو يحد منه في الترتيب.`
+      )),
+    ];
 
     if (runner) {
-      if (analysis.tooClose) {
-        lines.push(t(
-          `La différence entre "${top.name}" (#1) et "${runner.name}" (#2) est faible (${fNum(analysis.gapAbsolute, 1)} pts — ${fNum(analysis.gapPct, 1)}%) : les deux fournisseurs sont quasi équivalents, ce qui suggère une stratégie de double sourcing.`,
-          `الفرق بين "${top.name}" (المرتبة الأولى) و"${runner.name}" (المرتبة الثانية) ضعيف (${fNum(analysis.gapAbsolute, 1)} نقطة — ${fNum(analysis.gapPct, 1)}%): المورِّدان متعادلان تقريباً مما يدفع نحو استراتيجية التوريد المزدوج.`
-        ));
-      } else {
-        lines.push(t(
-          `"${top.name}" devance "${runner.name}" de ${fNum(analysis.gapAbsolute, 1)} points (${fNum(analysis.gapPct, 1)}%), ce qui représente un avantage clair.`,
-          `يتفوق "${top.name}" على "${runner.name}" بـ ${fNum(analysis.gapAbsolute, 1)} نقطة (${fNum(analysis.gapPct, 1)}%)، وهو تفوق واضح.`
-        ));
-      }
+      lines.push(t(
+        analysis.tooClose
+          ? `"${supplierName(top)}" ne devance "${supplierName(runner)}" que de ${fNum(analysis.gapAbsolute, 1)} points, soit ${fNum(analysis.gapPct, 1)} % de sa note. L'écart est suffisamment faible pour que le deuxième fournisseur reste une alternative crédible.`
+          : `"${supplierName(top)}" devance "${supplierName(runner)}" de ${fNum(analysis.gapAbsolute, 1)} points, soit ${fNum(analysis.gapPct, 1)} % de sa note. Cet avantage sépare clairement le premier choix de l'alternative immédiate.`,
+        analysis.tooClose
+          ? `"${supplierName(top)}" لا يتقدم على "${supplierName(runner)}" إلا بفارق ${fNum(analysis.gapAbsolute, 1)} نقطة، أي ${fNum(analysis.gapPct, 1)}% من نتيجته. الفارق محدود بما يكفي ليبقى المورد الثاني بديلاً موثوقاً.`
+          : `يتقدم "${supplierName(top)}" على "${supplierName(runner)}" بفارق ${fNum(analysis.gapAbsolute, 1)} نقطة، أي ${fNum(analysis.gapPct, 1)}% من نتيجته. ويفصل هذا التفوق بوضوح بين الخيار الأول والبديل المباشر.`
+      ));
+    }
+
+    if (analysis.weakPoints.length > 0) {
+      const weakPoints = analysis.weakPoints
+        .map(w => `"${w.criterionName}" (${fNum(w.rawScore, 1)} ${t("sur", "من")} ${fNum(w.maxScore, 1)}, poids ${fNum(w.weight, 1)} %)`)
+        .join(", ");
+      lines.push(t(
+        `"${supplierName(top)}" reste le meilleur choix, mais ses points de vigilance sont ${weakPoints}. Ils doivent être couverts dans le contrat pour éviter qu'une faiblesse sur un critère important ne réduise l'avantage observé.`,
+        `يبقى "${supplierName(top)}" الخيار الأفضل، لكن نقاط الانتباه لديه هي ${weakPoints}. ينبغي تغطية هذه الجوانب في العقد حتى لا يؤدي ضعف معيار مهم إلى تقليص التفوق المسجل.`
+      ));
     }
 
     lines.push(t(
-      `Le critère le plus déterminant dans ce classement est "${driving.name}" avec un poids de ${driving.weight}%. Les performances sur ce critère influencent fortement le score final.`,
-      `المعيار الأكثر تأثيراً في هذا الترتيب هو "${driving.name}" بوزن ${driving.weight}%. الأداء على هذا المعيار يُحدّد بشكل كبير النقاط الإجمالية.`
+      analysis.tooClose && runner
+        ? `La décision pratique est de contractualiser en priorité avec "${supplierName(top)}", tout en partageant une partie des volumes avec "${supplierName(runner)}" afin de limiter la dépendance et le risque de rupture.`
+        : `La décision pratique est de contractualiser avec "${supplierName(top)}" et de conserver "${runner ? supplierName(runner) : t("le meilleur fournisseur suivant", "المورد التالي الأفضل")}" comme solution de secours. Le choix doit être confirmé par une négociation sur les conditions de livraison, la qualité et les engagements de service.`,
+      analysis.tooClose && runner
+        ? `القرار العملي هو إبرام العقد أولاً مع "${supplierName(top)}" مع توزيع جزء من الكميات على "${supplierName(runner)}" للحد من التبعية ومخاطر انقطاع التوريد.`
+        : `القرار العملي هو إبرام العقد مع "${supplierName(top)}" والاحتفاظ بـ"${runner ? supplierName(runner) : "المورد التالي الأفضل"}" كخيار احتياطي. ويُؤكّد الاختيار بالتفاوض حول شروط التسليم والجودة والتزامات الخدمة.`
     ));
-
-    if (analysis.weakPoints.length > 0) {
-      const wpNames = analysis.weakPoints.map(w => `"${w.criterionName}"`).join(", ");
-      lines.push(t(
-        `Attention : "${top.name}" présente des scores faibles (< 50 %) sur les critères critiques suivants : ${wpNames}. Ces points faibles peuvent constituer un risque opérationnel.`,
-        `تحذير: يُسجّل "${top.name}" نقاطاً ضعيفة (أقل من 50%) على المعايير الحساسة التالية: ${wpNames}. هذه النقاط الضعيفة قد تُشكّل مخاطر تشغيلية.`
-      ));
-    }
 
     return lines;
   }
@@ -233,16 +257,19 @@ export default function SupplierSelection() {
     const runner = analysis.runnerUp;
     const sugs: { icon: string; title: string; desc: string; color: string; borderColor: string }[] = [];
 
-    // Primary recommendation: negotiate with top
+    const topName = top.name || t(`fournisseur ${top.rank}`, `المورد ${top.rank}`);
+    const runnerName = runner?.name || (runner ? t(`fournisseur ${runner.rank}`, `المورد ${runner.rank}`) : "");
+
+    // Primary recommendation: negotiate with the ranked winner
     sugs.push({
       icon: "🤝", color: "bg-green-50", borderColor: "border-l-green-500",
       title: t(
-        `Négociez et contractualisez avec "${top.name}"`,
-        `تفاوض وأبرم عقداً مع "${top.name}"`
+        `Négociez et contractualisez avec "${topName}"`,
+        `تفاوض وأبرم عقداً مع "${topName}"`
       ),
       desc: t(
-        `Avec un score de ${fNum(top.totalScore, 1)}/100, "${top.name}" est le choix recommandé. Entamez une négociation sur les volumes d'achat, les délais de paiement et les conditions de livraison pour sécuriser un partenariat à long terme.`,
-        `بنقطة ${fNum(top.totalScore, 1)}/100، يُعدّ "${top.name}" الخيار الموصى به. ابدأ التفاوض على الكميات وآجال الدفع وشروط التسليم لتأمين شراكة مستدامة.`
+        `Avec ${fNum(top.totalScore, 1)} points sur 100, "${topName}" est le choix recommandé. Négociez les volumes, les délais de paiement et les conditions de livraison en vous appuyant sur ses critères les plus solides.`,
+        `بنتيجة ${fNum(top.totalScore, 1)} نقطة من 100، يُعدّ "${topName}" الخيار الموصى به. تفاوض على الكميات وآجال الدفع وشروط التسليم مع الاستناد إلى معاييره الأقوى.`
       ),
     });
 
@@ -251,12 +278,12 @@ export default function SupplierSelection() {
       sugs.push({
         icon: "⚖️", color: "bg-blue-50", borderColor: "border-l-blue-500",
         title: t(
-          `Double sourcing : "${top.name}" + "${runner.name}"`,
-          `توريد مزدوج: "${top.name}" + "${runner.name}"`
+          `Double sourcing : "${topName}" + "${runnerName}"`,
+          `توريد مزدوج: "${topName}" + "${runnerName}"`
         ),
         desc: t(
-          `Les scores très proches entre les deux premiers fournisseurs (écart < 5 pts) justifient une stratégie de double sourcing : allouez 60–70% des volumes à "${top.name}" et 30–40% à "${runner.name}" pour réduire la dépendance et le risque de rupture.`,
-          `التقارب الكبير بين المرتبتين الأولى والثانية (فارق أقل من 5 نقاط) يُبرّر استراتيجية التوريد المزدوج: خصّص 60-70% من الحجم لـ"${top.name}" و30-40% لـ"${runner.name}" للحد من التبعية ومخاطر الانقطاع.`
+          `L'écart de ${fNum(analysis.gapAbsolute, 1)} points justifie une stratégie de double sourcing : allouez la majorité des volumes à "${topName}" et le solde à "${runnerName}" pour réduire la dépendance et le risque de rupture.`,
+          `الفارق البالغ ${fNum(analysis.gapAbsolute, 1)} نقطة يبرر استراتيجية التوريد المزدوج: خصّص غالبية الكميات لـ"${topName}" والباقي لـ"${runnerName}" للحد من التبعية ومخاطر الانقطاع.`
         ),
       });
     }
@@ -267,18 +294,18 @@ export default function SupplierSelection() {
       sugs.push({
         icon: "⚠️", color: "bg-amber-50", borderColor: "border-l-amber-500",
         title: t(
-          `Atténuez les risques sur : ${criteriaNames}`,
-          `خفّف المخاطر على: ${criteriaNames}`
+          `Sécurisez "${topName}" sur : ${criteriaNames}`,
+          `أمّن أداء "${topName}" في: ${criteriaNames}`
         ),
         desc: t(
-          `"${top.name}" obtient des scores insuffisants sur ces critères critiques. Incluez des clauses contractuelles de performance (pénalités de retard, audits qualité) et identifiez un fournisseur de secours pour ces dimensions.`,
-          `يُسجّل "${top.name}" نتائج غير كافية على هذه المعايير الحساسة. أدرج في العقد بنوداً لأداء: عقوبات التأخير، تدقيقات الجودة، وحدّد مورّداً احتياطياً لهذه الجوانب.`
+          `Regroupez dans le contrat les engagements de "${topName}" sur ces critères : pénalités de retard, audits qualité et solution de secours. Une seule clause de suivi couvre ainsi toutes les faiblesses identifiées.`,
+          `اجمع في العقد التزامات "${topName}" بشأن هذه المعايير: عقوبات التأخير وتدقيقات الجودة وخيار التوريد الاحتياطي. يغطي بند متابعة واحد جميع نقاط الضعف المحددة.`
         ),
       });
     }
 
     // General: review periodically
-    if (sugs.length < 3) {
+    if (sugs.length < 2) {
       sugs.push({
         icon: "🔄", color: "bg-green-50", borderColor: "border-l-green-500",
         title: t("Réévaluez annuellement le panel fournisseurs", "راجع قائمة الموردين سنوياً"),
@@ -289,7 +316,7 @@ export default function SupplierSelection() {
       });
     }
 
-    return sugs.slice(0, 3);
+    return sugs;
   }
 
   const analysisLines = results ? buildAnalysisLines() : [];
