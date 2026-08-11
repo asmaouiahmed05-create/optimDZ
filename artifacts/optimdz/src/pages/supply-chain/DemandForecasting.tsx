@@ -184,38 +184,62 @@ export default function DemandForecasting() {
   // ── Analysis ─────────────────────────────────────────────────────────────────
   function buildAnalysisLines(): string[] {
     if (!results) return [];
-    const avgMAE  = results.reduce((s, r) => s + r.mae,  0) / results.length;
+    const avgMAE = results.reduce((s, r) => s + r.mae, 0) / results.length;
     const avgMAPE = results.reduce((s, r) => s + r.mape, 0) / results.length;
-    const rising  = results.filter(r => r.trend === "increasing");
+    const rising = results.filter(r => r.trend === "increasing");
     const falling = results.filter(r => r.trend === "decreasing");
-    const stable  = results.filter(r => r.trend === "stable");
-    const highVol = results.filter(r => r.volatility === "high");
+    const stable = results.filter(r => r.trend === "stable");
 
     const modeName = mode === "moving-average"
       ? t("Moyenne Mobile", "المتوسط المتحرك")
       : t("Lissage Exponentiel Simple", "التمهيد الأسي البسيط");
 
+    const parameterText = mode === "moving-average"
+      ? t(
+        `en lissant les ${products.map(p => `${p.name || t("produit", "المنتج")} avec une fenêtre de ${p.windowSize} périodes`).join(" et ")}`,
+        `مع تنعيم ${products.map(p => `${p.name || t("المنتج", "المنتج")} على مدى ${p.windowSize} فترات`).join(" و")}`
+      )
+      : t(
+        `avec un coefficient de lissage de ${products.map(p => `${p.name || t("produit", "المنتج")} égal à ${fNum(p.alpha, 2)}`).join(" et ")}`,
+        `باستخدام معامل تمهيد قدره ${products.map(p => `${p.name || t("المنتج", "المنتج")} ${fNum(p.alpha, 2)}`).join(" و")}`
+      );
+
     const lines: string[] = [
       t(
-        `L'analyse porte sur ${results.length} produit(s) avec le modèle ${modeName}. MAE moyen : ${fNum(avgMAE, 1)} unités — MAPE moyen : ${fNum(avgMAPE, 1)}%.`,
-        `التحليل يشمل ${results.length} منتج(ات) باستخدام نموذج ${modeName}. متوسط الخطأ المطلق (MAE): ${fNum(avgMAE, 1)} وحدة — متوسط نسبة الخطأ (MAPE): ${fNum(avgMAPE, 1)}%.`
+        `L'analyse porte sur ${results.length} produit(s) et prévoit la prochaine demande avec le modèle ${modeName}, ${parameterText}. En moyenne, la prévision s'élève à ${fNum(results.reduce((s, r) => s + r.nextForecast, 0) / results.length, 1)} unités par produit, avec une erreur moyenne de ${fNum(avgMAE, 1)} unités (${fNum(avgMAPE, 1)} %). Ces écarts donnent au manager une marge réaliste à intégrer dans les achats plutôt qu'un chiffre à suivre sans contrôle.`,
+        `يشمل التحليل ${results.length} منتج(ات) ويتنبأ بالطلب القادم باستخدام نموذج ${modeName}، ${parameterText}. يبلغ متوسط التنبؤ ${fNum(results.reduce((s, r) => s + r.nextForecast, 0) / results.length, 1)} وحدة لكل منتج، مع خطأ متوسط قدره ${fNum(avgMAE, 1)} وحدة (${fNum(avgMAPE, 1)}%). تساعد هذه الفروقات المسؤول على تحديد هامش واقعي للمشتريات بدلاً من التعامل مع التنبؤ كرقم ثابت.`
       ),
     ];
+
+    for (const r of results) {
+      const product = r.name || t(`produit ${r.id}`, `المنتج ${r.id}`);
+      const trendText = r.trend === "increasing"
+        ? t("une tendance à la hausse", "اتجاهاً صاعداً")
+        : r.trend === "decreasing"
+        ? t("une tendance à la baisse", "اتجاهاً هابطاً")
+        : t("une demande stable", "طلباً مستقراً");
+      const decisionText = r.trend === "increasing"
+        ? t("préparer davantage d'approvisionnement avant le prochain cycle", "الاستعداد لزيادة التوريد قبل الدورة القادمة")
+        : r.trend === "decreasing"
+        ? t("réduire progressivement les engagements pour éviter un stock dormant", "خفض الالتزامات تدريجياً لتفادي المخزون الراكد")
+        : t("maintenir un rythme d'achat proche du niveau habituel", "الحفاظ على وتيرة شراء قريبة من المستوى المعتاد");
+      lines.push(t(
+        `Pour ${product}, la demande attendue est de ${fNum(r.nextForecast, 1)} unités et l'erreur moyenne observée est de ${fNum(r.mae, 1)} unités. L'historique montre ${trendText}; le chiffre est donc surtout utile pour ${decisionText}.`,
+        `بالنسبة إلى ${product}، يبلغ الطلب المتوقع ${fNum(r.nextForecast, 1)} وحدة، بينما يبلغ متوسط الخطأ المسجل ${fNum(r.mae, 1)} وحدة. تُظهر البيانات التاريخية ${trendText}؛ لذلك يفيد هذا الرقم عملياً في ${decisionText}.`
+      ));
+    }
+
     if (rising.length > 0) lines.push(t(
-      `Produits à demande croissante : ${rising.map(r => r.name).join(", ")} — il convient d'augmenter les niveaux de stock par anticipation.`,
-      `المنتجات ذات الطلب المتصاعد: ${rising.map(r => r.name).join("، ")} — يُستحسن رفع مستويات التخزين استباقياً.`
+      `La tendance globale appelle une planification plus offensive pour ${rising.map(r => `${r.name || `produit ${r.id}`} (${fNum(r.nextForecast, 1)} unités prévues)`).join(", ")} : sécurisez les volumes et réévaluez les seuils de réapprovisionnement avant que la hausse ne crée des ruptures.`,
+      `يتطلب الاتجاه العام تخطيطاً استباقياً لـ ${rising.map(r => `${r.name || `المنتج ${r.id}`} (${fNum(r.nextForecast, 1)} وحدة متوقعة)`).join("، ")}؛ أمّن الكميات وراجع عتبات إعادة الطلب قبل أن يؤدي ارتفاع الطلب إلى نفاد المخزون.`
     ));
     if (falling.length > 0) lines.push(t(
-      `Produits à demande décroissante : ${falling.map(r => r.name).join(", ")} — révisez la politique d'approvisionnement pour éviter le sur-stockage.`,
-      `المنتجات ذات الطلب المتراجع: ${falling.map(r => r.name).join("، ")} — راجع سياسة الطلب لتجنّب فائض المخزون.`
+      `La baisse attendue concerne ${falling.map(r => `${r.name || `produit ${r.id}`} (${fNum(r.nextForecast, 1)} unités prévues)`).join(", ")}. Réduisez les commandes par étapes et écoulez le stock existant avant de reconduire les volumes habituels.`,
+      `يشمل الانخفاض المتوقع ${falling.map(r => `${r.name || `المنتج ${r.id}`} (${fNum(r.nextForecast, 1)} وحدة متوقعة)`).join("، ")}. خفّض الطلبات تدريجياً واستنفد المخزون الحالي قبل إعادة اعتماد الكميات المعتادة.`
     ));
     if (stable.length > 0) lines.push(t(
-      `Produits à demande stable : ${stable.map(r => r.name).join(", ")} — niveau régulier facilitant la planification des achats.`,
-      `المنتجات ذات الطلب المستقر: ${stable.map(r => r.name).join("، ")} — مستوى ثابت يُسهّل تخطيط المشتريات.`
-    ));
-    if (highVol.length > 0) lines.push(t(
-      `Produits à forte volatilité : ${highVol.map(r => r.name).join(", ")} — un stock de sécurité plus élevé est recommandé.`,
-      `منتجات ذات تقلب مرتفع: ${highVol.map(r => r.name).join("، ")} — يُنصح بمخزون أمان أعلى لامتصاص هذا التقلب.`
+      `La demande reste stable pour ${stable.map(r => `${r.name || `produit ${r.id}`} (${fNum(r.nextForecast, 1)} unités prévues)`).join(", ")}. Cette visibilité permet de planifier les achats à un niveau régulier, tout en conservant une petite marge correspondant à l'erreur observée.`,
+      `يبقى الطلب مستقراً لدى ${stable.map(r => `${r.name || `المنتج ${r.id}`} (${fNum(r.nextForecast, 1)} وحدة متوقعة)`).join("، ")}. تسمح هذه الرؤية بتخطيط المشتريات بانتظام مع الاحتفاظ بهامش صغير يعكس الخطأ المسجل.`
     ));
     return lines;
   }
@@ -223,7 +247,9 @@ export default function DemandForecasting() {
   function buildSuggestions(): { icon: string; title: string; desc: string; color: string; borderColor: string }[] {
     if (!results) return [];
     const highVol = results.filter(r => r.volatility === "high");
-    const rising  = results.filter(r => r.trend === "increasing");
+    const trendGroups = (["increasing", "decreasing", "stable"] as const)
+      .map(trend => ({ trend, items: results.filter(r => r.trend === trend) }))
+      .filter(group => group.items.length > 0);
     const avgMAPE = results.reduce((s, r) => s + r.mape, 0) / results.length;
 
     const sugs: { icon: string; title: string; desc: string; color: string; borderColor: string }[] = [];
@@ -233,8 +259,8 @@ export default function DemandForecasting() {
         icon: "✅", color: "bg-green-50", borderColor: "border-l-green-500",
         title: t("Précision de prévision satisfaisante", "دقة التنبؤ جيدة"),
         desc: t(
-          `Le MAPE moyen (${fNum(avgMAPE, 1)}%) est dans la plage acceptable (< 10 %). Ces prévisions peuvent être utilisées de façon fiable pour la planification des stocks et des achats.`,
-          `متوسط نسبة الخطأ (MAPE = ${fNum(avgMAPE, 1)}%) ضمن النطاق المقبول (أقل من 10%). يمكن الاعتماد على هذه التنبؤات في تخطيط المخزون والمشتريات.`
+          `L'erreur moyenne de prévision est de ${fNum(avgMAPE, 1)} %, un niveau satisfaisant pour planifier les stocks et les achats avec confiance.`,
+          `يبلغ متوسط خطأ التنبؤ ${fNum(avgMAPE, 1)}%، وهو مستوى جيد يسمح بالاعتماد على التنبؤ في تخطيط المخزون والمشتريات.`
         ),
       });
     } else if (avgMAPE < 25) {
@@ -242,8 +268,8 @@ export default function DemandForecasting() {
         icon: "⚠️", color: "bg-amber-50", borderColor: "border-l-amber-500",
         title: t("Précision moyenne — enrichissez les données", "دقة تنبؤ متوسطة — أضف بيانات أكثر"),
         desc: t(
-          `MAPE = ${fNum(avgMAPE, 1)}% — précision modérée. Augmenter le nombre de périodes historiques (≥18) améliorerait les prévisions. Vérifiez aussi les effets saisonniers.`,
-          `MAPE = ${fNum(avgMAPE, 1)}% — دقة معتدلة. زيادة عدد الفترات التاريخية (≥18 فترة) ستحسّن التنبؤ. تحقّق أيضاً من وجود أنماط موسمية.`
+          `L'erreur moyenne de prévision atteint ${fNum(avgMAPE, 1)} %, ce qui invite à enrichir l'historique avec davantage de périodes et à vérifier les effets saisonniers avant de figer les achats.`,
+          `يبلغ متوسط خطأ التنبؤ ${fNum(avgMAPE, 1)}%، لذلك من الأفضل إضافة فترات تاريخية أخرى والتحقق من التأثيرات الموسمية قبل تثبيت المشتريات.`
         ),
       });
     } else {
@@ -251,41 +277,49 @@ export default function DemandForecasting() {
         icon: "🔴", color: "bg-red-50", borderColor: "border-l-red-500",
         title: t("Erreur élevée — révisez les données", "خطأ تنبؤ مرتفع — راجع البيانات"),
         desc: t(
-          `MAPE = ${fNum(avgMAPE, 1)}% — erreur élevée indiquant que le modèle actuel ne correspond pas bien aux données. Essayez l'autre modèle ou vérifiez les valeurs aberrantes.`,
-          `MAPE = ${fNum(avgMAPE, 1)}% — خطأ مرتفع يشير إلى عدم ملاءمة النموذج. جرّب النموذج الآخر أو راجع البيانات التاريخية بحثاً عن قيم شاذة.`
+          `L'erreur moyenne de prévision atteint ${fNum(avgMAPE, 1)} %, ce qui rend les volumes moins sûrs. Comparez l'autre méthode et vérifiez les valeurs inhabituelles avant de prendre un engagement important.`,
+          `يبلغ متوسط خطأ التنبؤ ${fNum(avgMAPE, 1)}%، مما يجعل الكميات أقل موثوقية. قارن بالطريقة الأخرى وراجع القيم غير المعتادة قبل اتخاذ قرار شراء كبير.`
         ),
       });
     }
 
-    if (rising.length > 0) {
+    for (const group of trendGroups) {
+      const items = group.items.map(r => `${r.name || t(`produit ${r.id}`, `المنتج ${r.id}`)} (${fNum(r.nextForecast, 1)} ${t("unités prévues", "وحدة متوقعة")})`).join(", ");
+      const trendAction = group.trend === "increasing"
+        ? t("sécurisez des volumes supplémentaires et relevez progressivement les seuils de réapprovisionnement", "أمّن كميات إضافية وارفع عتبات إعادة الطلب تدريجياً")
+        : group.trend === "decreasing"
+        ? t("réduisez les engagements et écoulez le stock existant avant de renouveler les commandes", "خفّض الالتزامات واستنفد المخزون الحالي قبل تجديد الطلبات")
+        : t("conservez un rythme d'achat régulier et ajustez-le seulement selon l'erreur constatée", "حافظ على وتيرة شراء منتظمة ولا تعدّلها إلا وفق الخطأ المسجل");
+      const trendLabel = group.trend === "increasing"
+        ? t("Demande en hausse", "طلب متصاعد")
+        : group.trend === "decreasing"
+        ? t("Demande en baisse", "طلب متراجع")
+        : t("Demande stable", "طلب مستقر");
       sugs.push({
-        icon: "📈", color: "bg-blue-50", borderColor: "border-l-blue-500",
-        title: t(
-          `Anticiper la hausse : ${rising.map(r => r.name).join(", ")}`,
-          `استعداداً للطلب المتزايد: ${rising.map(r => r.name).join("، ")}`
-        ),
+        icon: group.trend === "increasing" ? "📈" : group.trend === "decreasing" ? "📉" : "➡️",
+        color: group.trend === "increasing" ? "bg-blue-50" : group.trend === "decreasing" ? "bg-amber-50" : "bg-green-50",
+        borderColor: group.trend === "increasing" ? "border-l-blue-500" : group.trend === "decreasing" ? "border-l-amber-500" : "border-l-green-500",
+        title: `${trendLabel} : ${items}`,
         desc: t(
-          `Ces produits montrent une tendance haussière. Révisez les niveaux EOQ et les points de commande, et anticipez des négociations fournisseurs pour sécuriser des volumes plus importants.`,
-          `هذه المنتجات تُظهر اتجاهاً صاعداً. راجع مستويات EOQ وعتبات إعادة الطلب وأعدّ تفاوضاً مع الموردين لتأمين كميات أكبر.`
+          `Pour ce groupe, ${trendAction}.`,
+          `بالنسبة إلى هذه المجموعة، ${trendAction}.`
         ),
       });
     }
 
     if (highVol.length > 0) {
+      const items = highVol.map(r => `${r.name || t(`produit ${r.id}`, `المنتج ${r.id}`)} (${fNum(r.nextForecast, 1)} ${t("unités prévues", "وحدة متوقعة")})`).join(", ");
       sugs.push({
         icon: "🛡️", color: "bg-amber-50", borderColor: "border-l-amber-500",
-        title: t(
-          `Stock de sécurité renforcé : ${highVol.map(r => r.name).join(", ")}`,
-          `مخزون أمان أعلى: ${highVol.map(r => r.name).join("، ")}`
-        ),
+        title: `${t("Variabilité élevée", "تقلب مرتفع")} : ${items}`,
         desc: t(
-          `Ces produits affichent une forte variabilité de la demande. Augmentez le stock de sécurité de 30 à 50% et adoptez une politique de commande flexible révisée mensuellement.`,
-          `هذه المنتجات تُعاني من تقلب مرتفع في الطلب. يُنصح برفع مخزون الأمان بنسبة 30-50% واعتماد سياسة طلب مرنة تراجع شهرياً.`
+          `Augmentez le stock de sécurité de 30 à 50 % et révisez ces commandes chaque mois afin d'absorber les écarts sans surcharger les autres produits.`,
+          `ارفع مخزون الأمان بنسبة 30-50% وراجع هذه الطلبات شهرياً لاستيعاب الفروقات دون زيادة مخزون المنتجات الأخرى.`
         ),
       });
     }
 
-    if (sugs.length < 3) {
+    if (sugs.length < 2) {
       sugs.push({
         icon: "🔄", color: "bg-green-50", borderColor: "border-l-green-500",
         title: t("Révision périodique du modèle", "مراجعة دورية للنموذج"),
@@ -296,7 +330,7 @@ export default function DemandForecasting() {
       });
     }
 
-    return sugs.slice(0, 3);
+    return sugs;
   }
 
   const analysisLines = results ? buildAnalysisLines() : [];
