@@ -276,27 +276,33 @@ export default function InventoryManagement() {
     const lines: string[] = [];
     if (mode === "eoq" && eoqResults) {
       const total = eoqResults.reduce((s, r) => s + r.totalCost, 0);
-      const best = [...eoqResults].sort((a, b) => a.totalCost - b.totalCost)[0];
+      const highestCost = [...eoqResults].sort((a, b) => b.totalCost - a.totalCost)[0];
       lines.push(
         t(
-          `L'analyse EOQ porte sur ${eoqResults.length} produit(s). La coût annuel total optimisé est de ${fDA(total, "fr")}.`,
-          `يشمل تحليل EOQ ${eoqResults.length} منتج(ات). التكلفة السنوية الإجمالية المحسّنة هي ${fDA(total, "ar")}.`
+          `L'analyse porte sur ${eoqResults.length} produit(s) et conduit à un coût annuel total de ${fDA(total, "fr")}. Pour chaque article, la quantité économique indique le volume à commander à chaque réapprovisionnement afin d'équilibrer les frais de commande et de stockage.`,
+          `يشمل التحليل ${eoqResults.length} منتج(ات)، وتبلغ التكلفة السنوية الإجمالية ${fDA(total, "ar")}. بالنسبة لكل مادة، تحدد الكمية الاقتصادية حجم الطلب في كل عملية تموين لتحقيق توازن بين تكلفة الطلب وتكلفة التخزين.`
+        ),
+        ...eoqResults.map(r =>
+          t(
+            `Pour "${r.name}", commandez environ ${fNum(r.eoq)} unités à chaque cycle, soit ${fNum(r.ordersPerYear)} commande(s) par an espacées d'environ ${fNum(r.cycleTime, 0)} jours. Cette cadence transforme le calcul en règle d'achat concrète ; le coût annuel correspondant est de ${fDA(r.totalCost, "fr")}.`,
+            `بالنسبة إلى "${r.name}"، اطلب حوالي ${fNum(r.eoq)} وحدة في كل دورة، أي ${fNum(r.ordersPerYear)} طلب(ات) سنوياً بفاصل يقارب ${fNum(r.cycleTime, 0)} يوماً. يحول هذا الإيقاع الحساب إلى قاعدة شراء عملية، وتبلغ تكلفته السنوية ${fDA(r.totalCost, "ar")}.`
+          )
         ),
         t(
-          `Le produit avec la meilleure commande économique est "${best.name}" avec EOQ = ${fNum(best.eoq)} unités et ${fNum(best.ordersPerYear)} commande(s)/an.`,
-          `المنتج ذو الكمية الاقتصادية الأمثل هو "${best.name}" بـ EOQ = ${fNum(best.eoq)} وحدة وعدد طلبات ${fNum(best.ordersPerYear)}/سنة.`
+          `"${highestCost.name}" représente la charge annuelle la plus élevée avec ${fDA(highestCost.totalCost, "fr")}. C'est le premier article à examiner si l'entreprise veut réduire les coûts de stockage ou négocier les frais de commande.`,
+          `"${highestCost.name}" يمثل أعلى عبء سنوي بقيمة ${fDA(highestCost.totalCost, "ar")}. لذلك يجب أن يكون أول مادة تراجعها المؤسسة عند البحث عن خفض تكاليف التخزين أو التفاوض على تكاليف الطلب.`
         )
       );
     } else if (mode === "reorder" && ropResults) {
       lines.push(
         t(
-          `L'analyse du point de commande porte sur ${ropResults.length} produit(s).`,
-          `يشمل تحليل نقطة إعادة الطلب ${ropResults.length} منتج(ات).`
+          `L'analyse couvre ${ropResults.length} produit(s). Le point de commande est le niveau de stock qui déclenche l'achat : il couvre la consommation attendue pendant le délai fournisseur et ajoute une réserve pour absorber les variations. Commander à ce niveau réduit le risque de rupture avant la livraison.`,
+          `يشمل التحليل ${ropResults.length} منتج(ات). نقطة إعادة الطلب هي مستوى المخزون الذي يطلق عملية الشراء؛ فهي تغطي الاستهلاك المتوقع خلال مهلة المورد وتضيف احتياطياً لمواجهة التغيرات. ويساعد الطلب عند هذا المستوى على تقليل خطر نفاد المخزون قبل وصول التوريد.`
         ),
         ...ropResults.map(r =>
           t(
-            `"${r.name}" : Point de commande = ${fNum(r.reorderPoint)} unités (Demande sur délai : ${fNum(r.demandDuringLeadTime)} + Stock sécurité : ${fNum(r.safetyStock)}).`,
-            `"${r.name}": نقطة إعادة الطلب = ${fNum(r.reorderPoint)} وحدة (طلب خلال المهلة: ${fNum(r.demandDuringLeadTime)} + مخزون أمان: ${fNum(r.safetyStock)}).`
+            `Pour "${r.name}", déclenchez la commande lorsque le stock atteint ${fNum(r.reorderPoint)} unités : ${fNum(r.demandDuringLeadTime)} unités couvriront les ${fNum(r.leadTime, 0)} jours de livraison et ${fNum(r.safetyStock)} unités resteront comme réserve. Cette règle protège la continuité d'approvisionnement tout en rendant le niveau d'alerte mesurable.`,
+            `بالنسبة إلى "${r.name}"، أطلق الطلب عندما يصل المخزون إلى ${fNum(r.reorderPoint)} وحدة؛ إذ تغطي ${fNum(r.demandDuringLeadTime)} وحدة استهلاك ${fNum(r.leadTime, 0)} أيام من التوريد، وتبقى ${fNum(r.safetyStock)} وحدة كاحتياط. تحمي هذه القاعدة استمرارية التموين وتجعل مستوى التنبيه قابلاً للقياس.`
           )
         )
       );
@@ -305,22 +311,23 @@ export default function InventoryManagement() {
       const catB = abcResults.filter(r => r.category === "B");
       const catC = abcResults.filter(r => r.category === "C");
       const totalVal = abcResults.reduce((s, r) => s + r.annualValue, 0);
+      const topA = [...catA].sort((a, b) => b.annualValue - a.annualValue)[0];
       lines.push(
         t(
-          `La classification ABC porte sur ${abcResults.length} produit(s) pour une valeur totale de ${fDA(totalVal, "fr")}.`,
-          `يشمل تصنيف ABC ${abcResults.length} منتج(ات) بقيمة إجمالية ${fDA(totalVal, "ar")}.`
+          `La valeur annuelle des ${abcResults.length} produit(s) atteint ${fDA(totalVal, "fr")}. Le classement montre où concentrer l'attention : les articles de classe A portent la part la plus importante de cette valeur et une erreur de stock sur ces références immobilise davantage de capital ou perturbe plus fortement l'activité.`,
+          `تبلغ القيمة السنوية للمنتجات وعددها ${abcResults.length} ما مجموعه ${fDA(totalVal, "ar")}. يوضح التصنيف أين يجب تركيز الاهتمام؛ فمواد الفئة A تحمل الحصة الأكبر من هذه القيمة، وأي خطأ في مخزونها يجمد رأس مال أكبر أو يؤثر بصورة أقوى على النشاط.`
         ),
         t(
-          `Catégorie A (priorité haute) : ${catA.length} produit(s) — ${catA.reduce((s, r) => s + r.percentage, 0).toFixed(1)}% de la valeur.`,
-          `الفئة A (أولوية عالية): ${catA.length} منتج(ات) — ${catA.reduce((s, r) => s + r.percentage, 0).toFixed(1)}% من القيمة.`
+          `La classe A regroupe ${catA.map(r => `"${r.name}" (${fDA(r.annualValue, "fr")}, ${r.percentage.toFixed(1)}% de la valeur)`).join(", ")} et représente ${catA.reduce((s, r) => s + r.percentage, 0).toFixed(1)}% de la valeur totale. Ces articles sont critiques pour le pilotage : ils justifient des inventaires fréquents, des seuils suivis de près et des décisions d'achat validées rapidement.`,
+          `تضم الفئة A ${catA.map(r => `"${r.name}" (${fDA(r.annualValue, "ar")}، ${r.percentage.toFixed(1)}% من القيمة)`).join("، ")} وتمثل ${catA.reduce((s, r) => s + r.percentage, 0).toFixed(1)}% من القيمة الإجمالية. هذه المواد حرجة في التسيير؛ لذلك تستحق جرداً متكرراً، ومتابعة دقيقة للحدود، وتسريع اعتماد قرارات الشراء.`
         ),
         t(
-          `Catégorie B (priorité moyenne) : ${catB.length} produit(s) — ${catB.reduce((s, r) => s + r.percentage, 0).toFixed(1)}% de la valeur.`,
-          `الفئة B (أولوية متوسطة): ${catB.length} منتج(ات) — ${catB.reduce((s, r) => s + r.percentage, 0).toFixed(1)}% من القيمة.`
+          `La classe B comprend ${catB.length} produit(s) et ${catB.reduce((s, r) => s + r.percentage, 0).toFixed(1)}% de la valeur ; un contrôle mensuel et une révision périodique des quantités suffisent généralement. La classe C représente ${catC.reduce((s, r) => s + r.percentage, 0).toFixed(1)}% avec ${catC.length} produit(s), ce qui permet une gestion plus simple et des commandes regroupées.`,
+          `تضم الفئة B ${catB.length} منتج(ات) وتمثل ${catB.reduce((s, r) => s + r.percentage, 0).toFixed(1)}% من القيمة؛ وتكفيها عادة رقابة شهرية ومراجعة دورية للكميات. أما الفئة C فتمثل ${catC.reduce((s, r) => s + r.percentage, 0).toFixed(1)}% عبر ${catC.length} منتج(ات)، مما يسمح بإدارة أبسط وطلبات مجمعة.`
         ),
         t(
-          `Catégorie C (priorité basse) : ${catC.length} produit(s) — ${catC.reduce((s, r) => s + r.percentage, 0).toFixed(1)}% de la valeur.`,
-          `الفئة C (أولوية منخفضة): ${catC.length} منتج(ات) — ${catC.reduce((s, r) => s + r.percentage, 0).toFixed(1)}% من القيمة.`
+          `"${topA?.name}" est l'article de classe A le plus important, avec ${fDA(topA?.annualValue ?? 0, "fr")} et ${topA?.percentage.toFixed(1)}% de la valeur totale. Commencez par vérifier régulièrement son stock, sa consommation et ses délais fournisseur avant d'étendre le même niveau de contrôle aux autres articles A.`,
+          `"${topA?.name}" هي أهم مادة في الفئة A بقيمة ${fDA(topA?.annualValue ?? 0, "ar")} وتمثل ${topA?.percentage.toFixed(1)}% من القيمة الإجمالية. ابدأ بمراجعة مخزونها واستهلاكها ومهلة موردها بانتظام قبل توسيع نفس مستوى الرقابة إلى باقي مواد الفئة A.`
         )
       );
     }
@@ -332,15 +339,15 @@ export default function InventoryManagement() {
     if (mode === "eoq" && eoqResults) {
       const highFreq = eoqResults.filter(r => r.ordersPerYear > 12);
       const highCost = [...eoqResults].sort((a, b) => b.totalCost - a.totalCost)[0];
-      return [
+      const suggestions = [
         {
           icon: "📦",
           color: "bg-green-50",
           borderColor: "border-l-green-500",
           title: t("تحسين دورة الطلب", "Optimiser le cycle de commande"),
           desc: t(
-            `اعتمد الكميات الاقتصادية المحسوبة بدقة لكل منتج. الطلب بالكميات الصحيحة يُقلّل التكلفة الإجمالية بتحقيق التوازن بين تكلفة الطلب وتكلفة الاحتفاظ.`,
-            `Adoptez les quantités économiques calculées pour chaque produit. Commander au bon volume équilibre les coûts de commande et de stockage pour minimiser le coût total.`
+            `اعتمد الكمية الاقتصادية المحسوبة لكل مادة: ${eoqResults.map(r => `${r.name} (${fNum(r.eoq)} وحدة)`).join("، ")}. اطلب هذه الكميات في كل دورة حتى توازن بين تكلفة الطلب والتخزين.`,
+            `Adoptez la quantité économique calculée pour chaque article : ${eoqResults.map(r => `${r.name} (${fNum(r.eoq)} unités)`).join(", ")}. Utilisez ces volumes à chaque cycle pour équilibrer les coûts de commande et de stockage.`
           ),
         },
         highFreq.length > 0 ? {
@@ -349,8 +356,8 @@ export default function InventoryManagement() {
           borderColor: "border-l-amber-500",
           title: t("منتجات ذات طلبات متكررة", "Produits à commandes fréquentes"),
           desc: t(
-            `${highFreq.map(r => r.name).join("، ")} تتطلب أكثر من 12 طلباً/سنة. فكّر في تفاوض شروط توريد أفضل أو رفع الكمية الاقتصادية عبر خفض تكلفة الاحتفاظ.`,
-            `${highFreq.map(r => r.name).join(", ")} nécessitent plus de 12 commandes/an. Négociez de meilleures conditions de livraison ou réduisez les coûts de possession.`
+            `${highFreq.map(r => `${r.name} (${fNum(r.ordersPerYear)} طلباً/سنة)`).join("، ")} تتطلب طلبات متكررة. تفاوض على شروط توريد أفضل أو خفّض تكلفة الاحتفاظ لتقليل الضغط اللوجستي.`,
+            `${highFreq.map(r => `${r.name} (${fNum(r.ordersPerYear)} commandes/an)`).join(", ")} nécessitent des commandes fréquentes. Négociez de meilleures conditions de livraison ou réduisez les coûts de possession pour alléger la charge logistique.`
           ),
         } : {
           icon: "✅",
@@ -368,11 +375,12 @@ export default function InventoryManagement() {
           borderColor: "border-l-red-500",
           title: t(`تكلفة إجمالية مرتفعة: ${highCost?.name}`, `Coût le plus élevé : ${highCost?.name}`),
           desc: t(
-            `"${highCost?.name}" يسجّل أعلى تكلفة سنوية (${fDA(highCost?.totalCost ?? 0, "ar")}). راجع تكلفة الاحتفاظ أو حاوِل التفاوض على خفض تكلفة الطلب مع المورد.`,
-            `"${highCost?.name}" représente la charge annuelle la plus lourde (${fDA(highCost?.totalCost ?? 0, "fr")}). Revoyez les coûts de possession ou négociez la réduction du coût de commande.`
+            `"${highCost?.name}" يسجّل أعلى تكلفة سنوية (${fDA(highCost?.totalCost ?? 0, "ar")})، لذلك ابدأ بمراجعة كمية طلبه وتكلفة التخزين والتفاوض مع المورد قبل تعديل باقي المواد.`,
+            `"${highCost?.name}" représente la charge annuelle la plus lourde (${fDA(highCost?.totalCost ?? 0, "fr")}). Commencez par revoir sa quantité commandée, son coût de stockage et les conditions fournisseur avant de modifier les autres articles.`
           ),
         },
       ];
+      return suggestions.filter((suggestion, index) => index !== 1 || highFreq.length > 0);
     } else if (mode === "reorder" && ropResults) {
       const highest = [...ropResults].sort((a, b) => b.reorderPoint - a.reorderPoint)[0];
       return [
@@ -382,8 +390,8 @@ export default function InventoryManagement() {
           borderColor: "border-l-blue-500",
           title: t("تفعيل نقاط إعادة الطلب في نظام المخزون", "Activer les points de commande dans le système"),
           desc: t(
-            "برمج نظام إدارة المخزون ليُصدر تنبيهاً تلقائياً عند وصول كل منتج إلى نقطة إعادة طلبه المحسوبة. هذا يمنع نفاد المخزون ويضمن استمرارية التوريد.",
-            "Programmez votre système de gestion pour émettre une alerte automatique dès qu'un produit atteint son point de commande calculé. Cela évite les ruptures et garantit la continuité."
+            `برمج تنبيهاً لكل مادة عند بلوغ نقطة إعادة طلبها: ${ropResults.map(r => `${r.name} (${fNum(r.reorderPoint)} وحدة)`).join("، ")}. هكذا يبدأ التوريد قبل نفاد المخزون.`,
+            `Programmez une alerte pour chaque article au niveau calculé : ${ropResults.map(r => `${r.name} (${fNum(r.reorderPoint)} unités)`).join(", ")}. Le réapprovisionnement démarre ainsi avant la rupture.`
           ),
         },
         {
@@ -392,8 +400,8 @@ export default function InventoryManagement() {
           borderColor: "border-l-green-500",
           title: t(`أعلى نقطة إعادة طلب: ${highest?.name}`, `Point de commande le plus élevé : ${highest?.name}`),
           desc: t(
-            `"${highest?.name}" يحتاج إلى مخزون قدره ${fNum(highest?.reorderPoint ?? 0)} وحدة عند إصدار الطلب. تأكد من وجود مساحة تخزين كافية ومتابعة مستمرة لمستوى هذا المنتج.`,
-            `"${highest?.name}" nécessite ${fNum(highest?.reorderPoint ?? 0)} unités en stock au moment de la commande. Assurez-vous de l'espace de stockage et du suivi continu de ce produit.`
+            `"${highest?.name}" هو أعلى أولوية لأن نقطة إعادة طلبه تبلغ ${fNum(highest?.reorderPoint ?? 0)} وحدة. خصص له مساحة تخزين ومتابعة يومية حتى لا يتجاوز الاستهلاك مخزون الأمان قبل وصول المورد.`,
+            `"${highest?.name}" est prioritaire car son point de commande atteint ${fNum(highest?.reorderPoint ?? 0)} unités. Réservez-lui l'espace nécessaire et un suivi quotidien pour éviter que la consommation ne dépasse la réserve avant la livraison.`
           ),
         },
         {
@@ -402,13 +410,15 @@ export default function InventoryManagement() {
           borderColor: "border-l-amber-500",
           title: t("مراجعة مخزون الأمان دورياً", "Réviser régulièrement le stock de sécurité"),
           desc: t(
-            "مخزون الأمان يعكس عدم اليقين في الطلب ومهلة التسليم. راجعه كل ربع سنة بناءً على البيانات الفعلية لتجنّب إما نفاد المخزون أو التجميد المالي.",
-            "Le stock de sécurité reflète l'incertitude de la demande et des délais. Révisez-le chaque trimestre sur la base des données réelles pour éviter ruptures et immobilisations financières."
+            `مخزون الأمان المحسوب هو ${ropResults.map(r => `${r.name}: ${fNum(r.safetyStock)} وحدة`).join("، ")}. راجعه كل ربع سنة وفق الطلب الفعلي ومهلة المورد لتفادي النفاد أو تجميد المال.`,
+            `Les réserves calculées sont les suivantes : ${ropResults.map(r => `${r.name} : ${fNum(r.safetyStock)} unités`).join(", ")}. Révisez-les chaque trimestre selon la demande réelle et le délai fournisseur pour éviter ruptures et immobilisations.`
           ),
         },
       ];
     } else if (mode === "abc" && abcResults) {
       const catA = abcResults.filter(r => r.category === "A");
+      const totalA = catA.reduce((s, r) => s + r.percentage, 0);
+      const catB = abcResults.filter(r => r.category === "B");
       const catC = abcResults.filter(r => r.category === "C");
       return [
         {
@@ -417,8 +427,8 @@ export default function InventoryManagement() {
           borderColor: "border-l-red-500",
           title: t("إدارة مكثّفة لمنتجات الفئة A", "Gestion intensive des produits A"),
           desc: t(
-            `منتجات الفئة A (${catA.map(r => r.name).join("، ")}) تمثّل 80% من القيمة. خصّص لها: متابعة أسبوعية، تحليل EOQ دقيق، عروض أسعار تنافسية، ومخزون أمان مضبوط.`,
-            `Les produits A (${catA.map(r => r.name).join(", ")}) représentent 80% de la valeur. Appliquez : suivi hebdomadaire, EOQ précis, appels d'offres concurrentiels, stock de sécurité calibré.`
+            `مواد الفئة A (${catA.map(r => `${r.name} (${fDA(r.annualValue, "ar")}، ${r.percentage.toFixed(1)}%)`).join("، ")}) تمثل ${totalA.toFixed(1)}% من القيمة. نفّذ لها جرداً أسبوعياً، وحدد كميات الشراء ونقاط إعادة الطلب بدقة، وراجع شروط الموردين.`,
+            `Les articles de classe A (${catA.map(r => `${r.name} (${fDA(r.annualValue, "fr")}, ${r.percentage.toFixed(1)}%)`).join(", ")}) représentent ${totalA.toFixed(1)}% de la valeur. Réalisez un inventaire hebdomadaire, fixez précisément les volumes et seuils de commande, puis révisez les conditions fournisseur.`
           ),
         },
         {
@@ -427,8 +437,8 @@ export default function InventoryManagement() {
           borderColor: "border-l-amber-500",
           title: t("رقابة دورية لمنتجات الفئة B", "Contrôle périodique des produits B"),
           desc: t(
-            "منتجات الفئة B تستحق رقابة شهرية ومراجعة دورية للأسعار. قد ترقى بعضها إلى الفئة A مستقبلاً إذا ارتفع الطلب.",
-            "Les produits B méritent un contrôle mensuel et une révision périodique des prix. Certains pourraient migrer vers A si la demande augmente — surveillez les tendances."
+            `مواد الفئة B وعددها ${catB.length} تمثل ${catB.reduce((s, r) => s + r.percentage, 0).toFixed(1)}% من القيمة. اكتفِ برقابة شهرية ومراجعة دورية للكميات والأسعار، مع رفع مستوى المتابعة إذا اقتربت من الفئة A.`,
+            `Les ${catB.length} articles de classe B représentent ${catB.reduce((s, r) => s + r.percentage, 0).toFixed(1)}% de la valeur. Un contrôle mensuel des quantités et des prix suffit, avec un suivi renforcé si leur valeur se rapproche de la classe A.`
           ),
         },
         {
@@ -437,8 +447,8 @@ export default function InventoryManagement() {
           borderColor: "border-l-green-500",
           title: t("تبسيط إدارة الفئة C", "Simplifier la gestion des produits C"),
           desc: t(
-            `منتجات الفئة C (${catC.slice(0, 3).map(r => r.name).join("، ")}...) منخفضة القيمة. استخدم سياسة الكميات الكبيرة أو أوامر الشراء الدورية الثابتة لتقليل الوقت الإداري المخصص لها.`,
-            `Les produits C (${catC.slice(0, 3).map(r => r.name).join(", ")}...) sont de faible valeur. Appliquez des commandes groupées ou des bons de commande périodiques fixes pour minimiser le temps administratif.`
+            `مواد الفئة C وعددها ${catC.length} تمثل ${catC.reduce((s, r) => s + r.percentage, 0).toFixed(1)}% من القيمة. استخدم طلبات مجمعة أو دورية ثابتة لتقليل الوقت الإداري دون استنزاف المتابعة المخصصة للمواد الحرجة.`,
+            `Les ${catC.length} articles de classe C représentent ${catC.reduce((s, r) => s + r.percentage, 0).toFixed(1)}% de la valeur. Utilisez des commandes groupées ou périodiques fixes afin de réduire le temps administratif consacré aux références moins prioritaires.`
           ),
         },
       ];
