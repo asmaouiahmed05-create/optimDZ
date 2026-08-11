@@ -149,71 +149,53 @@ export function validateInputs(inputs: EquipmentInput[]): ValidationError[] {
 // ── Analysis ──────────────────────────────────────────────────────────────────
 
 export function generateMaintenanceAnalysis(results: MaintenanceResults): AnalysisLine[] {
-  const lines: AnalysisLine[] = [];
   const valid = results.equipments.filter(e => e.status !== "error" && e.disponibilite !== null);
 
   if (valid.length === 0) {
     return [{ fr: "Aucune donnée valide à analyser.", ar: "لا توجد بيانات صالحة للتحليل." }];
   }
 
-  // Fleet overview
-  if (results.fleetDisponibilite !== null) {
-    const fd = results.fleetDisponibilite;
-    const fdLabel = fd >= 90
-      ? { fr: "satisfaisante", ar: "مُرضية" }
-      : fd >= 80
-        ? { fr: "acceptable mais à surveiller", ar: "مقبولة لكن تستوجب المتابعة" }
-        : { fr: "insuffisante — intervention requise", ar: "غير كافية — يلزم التدخل" };
+  const fleetAvailability = results.fleetDisponibilite ?? 0;
+  const fleetMtbf = results.fleetMtbf ?? 0;
+  const fleetMttr = results.fleetMttr ?? 0;
+  const lines: AnalysisLine[] = [{
+    fr: `Sur la flotte analysée, la disponibilité moyenne est de ${fmt2(fleetAvailability)}%. Les équipements fonctionnent en moyenne ${fmt1(fleetMtbf)} heures entre deux pannes et nécessitent ${fmt1(fleetMttr)} heures pour être remis en service. Plus les pannes sont rapprochées et les réparations longues, plus le risque d'arrêt de production augmente.`,
+    ar: `بالنسبة إلى المعدات محل التحليل، يبلغ متوسط التوافرية ${fmt2(fleetAvailability)}%. وتعمل المعدات في المتوسط ${fmt1(fleetMtbf)} ساعة بين عطلين وتحتاج إلى ${fmt1(fleetMttr)} ساعة لإعادتها إلى الخدمة. وكلما تقاربت الأعطال وطالت الإصلاحات زاد خطر توقف الإنتاج.`,
+  }];
+
+  for (const equipment of valid) {
+    const availability = equipment.disponibilite!;
+    const statusFr = availability < 80
+      ? `Avec une disponibilité de ${fmt2(availability)}%, « ${equipment.name} » est critique : ses arrêts peuvent perturber directement le programme de production et justifient une priorité de maintenance.`
+      : availability < 90
+        ? `Avec une disponibilité de ${fmt2(availability)}%, « ${equipment.name} » est préoccupant : sa marge avant un niveau critique est limitée et des arrêts répétés peuvent dégrader la régularité de la production.`
+        : `Avec une disponibilité de ${fmt2(availability)}%, « ${equipment.name} » présente un niveau opérationnel maîtrisé et reste compatible avec une surveillance préventive régulière.`;
+    const statusAr = availability < 80
+      ? `وبمعدل توافرية قدره ${fmt2(availability)}%، تُعد « ${equipment.name} » حرجة؛ فقد تؤثر توقفاتها مباشرة في برنامج الإنتاج، ولذلك يجب أن تحظى بأولوية الصيانة.`
+      : availability < 90
+        ? `وبمعدل توافرية قدره ${fmt2(availability)}%، تُعد « ${equipment.name} » مقلقة؛ فهامشها قبل الوصول إلى المستوى الحرج محدود، وقد تؤثر الأعطال المتكررة في انتظام الإنتاج.`
+        : `وبمعدل توافرية قدره ${fmt2(availability)}%، تحافظ « ${equipment.name} » على مستوى تشغيلي مضبوط، وتبقى مناسبة لمتابعة وقائية منتظمة.`;
     lines.push({
-      fr: `La disponibilité moyenne de la flotte est de ${fmt2(fd)}% — ${fdLabel.fr}. MTBF moyen : ${fmt1(results.fleetMtbf!)}h, MTTR moyen : ${fmt1(results.fleetMttr!)}h.`,
-      ar: `متوسط توافرية الأسطول يبلغ ${fmt2(fd)}% — ${fdLabel.ar}. متوسط MTBF: ${fmt1(results.fleetMtbf!)}س، متوسط MTTR: ${fmt1(results.fleetMttr!)}س.`,
+      fr: `« ${equipment.name} » tombe en panne en moyenne toutes les ${fmt1(equipment.mtbf!)} heures et sa réparation prend ${fmt1(equipment.mttr!)} heures. ${statusFr} Ces chiffres relient directement sa fiabilité au risque de temps d'arrêt et à la capacité réellement disponible.`,
+      ar: `تتعطل « ${equipment.name} » في المتوسط كل ${fmt1(equipment.mtbf!)} ساعة، ويستغرق إصلاحها ${fmt1(equipment.mttr!)} ساعة. ${statusAr} وتربط هذه الأرقام مباشرة بين موثوقيتها وخطر وقت التوقف والطاقة المتاحة فعلياً.`,
     });
   }
 
-  // Critical equipment (D < 80%)
-  const criticals = valid.filter(e => e.disponibilite! < 80);
-  if (criticals.length > 0) {
+  const highMttr = results.fleetMttr !== null && results.fleetMttr > 0
+    ? valid.filter(e => e.mttr! > results.fleetMttr! * 1.5 && e.mttr! > 4)
+    : [];
+  if (highMttr.length > 0) {
     lines.push({
-      fr: `${criticals.length} équipement(s) en situation critique (disponibilité < 80%) : ${criticals.map(e => `${e.name} (${fmt2(e.disponibilite!)}%)`).join(", ")}.`,
-      ar: `${criticals.length} معدة/معدات في وضع حرج (توافرية < 80%): ${criticals.map(e => `${e.name} (${fmt2(e.disponibilite!)}%)`).join("، ")}.`,
+      fr: `Le délai de réparation est particulièrement long pour ${highMttr.map(e => `« ${e.name} » avec ${fmt1(e.mttr!)} heures`).join(" et ")}. Même lorsque la disponibilité reste correcte, chaque intervention immobilise plus longtemps la ressource ; les pièces, les compétences et le diagnostic doivent donc être préparés avant la prochaine panne.`,
+      ar: `يستغرق الإصلاح وقتاً طويلاً بشكل خاص لدى ${highMttr.map(e => `« ${e.name} » بزمن قدره ${fmt1(e.mttr!)} ساعة`).join(" و")}. وحتى عندما تبقى التوافرية مقبولة، فإن كل تدخل يعطل المعدة مدة أطول؛ لذلك يجب تجهيز قطع الغيار والخبرات والتشخيص قبل العطل القادم.`,
     });
   }
 
-  // Warning equipment (80% ≤ D < 90%)
-  const warnings = valid.filter(e => e.disponibilite! >= 80 && e.disponibilite! < 90);
-  if (warnings.length > 0) {
-    lines.push({
-      fr: `${warnings.length} équipement(s) en zone d'alerte (80% ≤ D < 90%) : ${warnings.map(e => `${e.name} (${fmt2(e.disponibilite!)}%)`).join(", ")}.`,
-      ar: `${warnings.length} معدة/معدات في منطقة التحذير (80% ≤ D < 90%): ${warnings.map(e => `${e.name} (${fmt2(e.disponibilite!)}%)`).join("، ")}.`,
-    });
-  }
-
-  // High MTTR relative to fleet
-  if (results.fleetMttr !== null && results.fleetMttr > 0) {
-    const highMttr = valid.filter(e => e.mttr! > results.fleetMttr! * 1.5 && e.mttr! > 4);
-    if (highMttr.length > 0) {
-      lines.push({
-        fr: `MTTR élevé (> 1,5× la moyenne flotte de ${fmt1(results.fleetMttr!)}h) : ${highMttr.map(e => `${e.name} (${fmt1(e.mttr!)}h)`).join(", ")}.`,
-        ar: `زمن إصلاح مرتفع (> 1.5× متوسط الأسطول ${fmt1(results.fleetMttr!)}س): ${highMttr.map(e => `${e.name} (${fmt1(e.mttr!)}س)`).join("، ")}.`,
-      });
-    }
-  }
-
-  // Excellent performers
-  const excellent = valid.filter(e => e.disponibilite! >= 95);
-  if (excellent.length > 0) {
-    lines.push({
-      fr: `Équipement(s) performant(s) (D ≥ 95%) : ${excellent.map(e => `${e.name} (${fmt2(e.disponibilite!)}%)`).join(", ")}.`,
-      ar: `معدات بأداء ممتاز (D ≥ 95%): ${excellent.map(e => `${e.name} (${fmt2(e.disponibilite!)}%)`).join("، ")}.`,
-    });
-  }
-
-  // Excluded rows
   const errored = results.equipments.filter(e => e.status === "error");
   if (errored.length > 0) {
     lines.push({
-      fr: `${errored.length} équipement(s) exclu(s) de l'analyse (données manquantes ou nombre de pannes = 0) : ${errored.map(e => e.name).join(", ")}.`,
-      ar: `${errored.length} معدة/معدات مستبعدة من التحليل (بيانات ناقصة أو عدد أعطال = 0): ${errored.map(e => e.name).join("، ")}.`,
+      fr: `${errored.length} équipement(s) n'a pas pu être intégré à l'analyse : ${errored.map(e => `« ${e.name} »`).join(", ")}. Complétez ses données avant de décider afin de ne pas sous-estimer le risque d'arrêt.`,
+      ar: `تعذر إدراج ${errored.length} معدة في التحليل: ${errored.map(e => `« ${e.name} »`).join("، ")}. أكمل بياناتها قبل اتخاذ القرار حتى لا يتم التقليل من خطر التوقف.`,
     });
   }
 
@@ -230,47 +212,61 @@ export function generateMaintenanceRecommendations(results: MaintenanceResults):
 
   const avgMttr = results.fleetMttr ?? 0;
 
-  // Critical equipment — one targeted rec per equipment
   const criticals = valid.filter(e => e.disponibilite! < 80);
-  for (const eq of criticals) {
+  if (criticals.length > 0) {
+    const criticalDetailsFr = criticals
+      .map(eq => `« ${eq.name} » (${fmt2(eq.disponibilite!)}% disponible, ${fmt1(eq.mtbf!)} heures entre pannes, ${fmt1(eq.mttr!)} heures de réparation)`)
+      .join(" ; ");
+    const criticalDetailsAr = criticals
+      .map(eq => `« ${eq.name} » (توافرية ${fmt2(eq.disponibilite!)}%، ${fmt1(eq.mtbf!)} ساعة بين الأعطال، ${fmt1(eq.mttr!)} ساعة للإصلاح)`)
+      .join("؛ ");
     recs.push({
       icon: "🔴",
-      fr: `Plan de maintenance d'urgence pour « ${eq.name} »`,
-      ar: `خطة صيانة طارئة لـ « ${eq.name} »`,
-      descFr: `La disponibilité de « ${eq.name} » est de ${fmt2(eq.disponibilite!)}% — niveau critique. Avec un MTBF de ${fmt1(eq.mtbf!)}h et un MTTR de ${fmt1(eq.mttr!)}h, engagez immédiatement un programme de maintenance préventive renforcé : inspection hebdomadaire, remplacement des pièces d'usure et audit technique complet.`,
-      descAr: `توافرية « ${eq.name} » تبلغ ${fmt2(eq.disponibilite!)}% — مستوى حرج. مع MTBF بقيمة ${fmt1(eq.mtbf!)}س وMTTR بقيمة ${fmt1(eq.mttr!)}س، ابدأ فوراً ببرنامج صيانة وقائية مكثف: فحص أسبوعي، استبدال قطع التآكل، ومراجعة تقنية شاملة.`,
+      fr: `Prioriser ${criticals.map(e => `« ${e.name} »`).join(" et ")} dans le programme de maintenance`,
+      ar: `إعطاء الأولوية لـ ${criticals.map(e => `« ${e.name} »`).join(" و")} في برنامج الصيانة`,
+      descFr: `${criticalDetailsFr}. Planifiez une inspection préventive hebdomadaire pour ces équipements, remplacez les pièces d'usure et réalisez un diagnostic complet avant le prochain cycle afin de réduire le risque d'arrêt prolongé.`,
+      descAr: `${criticalDetailsAr}. برمج فحصاً وقائياً أسبوعياً لهذه المعدات، واستبدل قطع التآكل، وأنجز تشخيصاً شاملاً قبل الدورة القادمة لتقليل خطر التوقف الطويل.`,
     });
   }
 
-  // Warning equipment
   const warnings = valid.filter(e => e.disponibilite! >= 80 && e.disponibilite! < 90);
-  for (const eq of warnings) {
+  if (warnings.length > 0) {
+    const warningDetailsFr = warnings
+      .map(eq => `« ${eq.name} » (${fmt2(eq.disponibilite!)}% disponible, ${fmt1(eq.mtbf!)} heures entre pannes, ${fmt1(eq.mttr!)} heures de réparation)`)
+      .join(" ; ");
+    const warningDetailsAr = warnings
+      .map(eq => `« ${eq.name} » (توافرية ${fmt2(eq.disponibilite!)}%، ${fmt1(eq.mtbf!)} ساعة بين الأعطال، ${fmt1(eq.mttr!)} ساعة للإصلاح)`)
+      .join("؛ ");
     recs.push({
       icon: "🟡",
-      fr: `Renforcer la maintenance préventive de « ${eq.name} »`,
-      ar: `تعزيز الصيانة الوقائية لـ « ${eq.name} »`,
-      descFr: `« ${eq.name} » affiche une disponibilité de ${fmt2(eq.disponibilite!)}% (zone d'alerte). MTBF = ${fmt1(eq.mtbf!)}h, MTTR = ${fmt1(eq.mttr!)}h. Planifiez des inspections périodiques renforcées et vérifiez l'état des composants critiques pour stabiliser les indicateurs avant d'atteindre le seuil critique.`,
-      descAr: `« ${eq.name} » تسجل توافرية ${fmt2(eq.disponibilite!)}% (منطقة تحذير). MTBF = ${fmt1(eq.mtbf!)}س، MTTR = ${fmt1(eq.mttr!)}س. خطط لعمليات فحص دورية مكثفة وتحقق من حالة المكونات الحيوية لاستقرار المؤشرات قبل الوصول إلى العتبة الحرجة.`,
+      fr: `Renforcer la prévention sur ${warnings.map(e => `« ${e.name} »`).join(" et ")}`,
+      ar: `تعزيز الصيانة الوقائية لـ ${warnings.map(e => `« ${e.name} »`).join(" و")}`,
+      descFr: `${warningDetailsFr}. Ajoutez une inspection planifiée à chaque cycle, contrôlez les composants critiques et suivez l'évolution mensuelle avant que les arrêts ne deviennent plus fréquents.`,
+      descAr: `${warningDetailsAr}. أضف فحصاً مبرمجاً في كل دورة، وراقب المكونات الحيوية، وتابع التطور الشهري قبل أن تصبح التوقفات أكثر تكراراً.`,
     });
   }
 
-  // High MTTR but acceptable availability — recommend logistics improvement
   if (avgMttr > 0) {
     const highMttr = valid.filter(e =>
       e.mttr! > avgMttr * 1.5 && e.mttr! > 4 && e.disponibilite! >= 90
     ).slice(0, 2);
-    for (const eq of highMttr) {
+    if (highMttr.length > 0) {
+      const highMttrDetailsFr = highMttr
+        .map(eq => `« ${eq.name} » (${fmt1(eq.mttr!)} heures contre ${fmt1(avgMttr)} heures en moyenne)`)
+        .join(" ; ");
+      const highMttrDetailsAr = highMttr
+        .map(eq => `« ${eq.name} » (${fmt1(eq.mttr!)} ساعة مقابل ${fmt1(avgMttr)} ساعة في المتوسط)`)
+        .join("؛ ");
       recs.push({
         icon: "🔧",
-        fr: `Réduire le temps de réparation de « ${eq.name} »`,
-        ar: `تقليص زمن إصلاح « ${eq.name} »`,
-        descFr: `« ${eq.name} » a un MTTR de ${fmt1(eq.mttr!)}h (${(eq.mttr! / avgMttr).toFixed(1)}× la moyenne de la flotte). Constituez un stock de pièces de rechange dédié et formez les techniciens aux procédures d'intervention rapide pour ramener ce délai sous ${fmt1(avgMttr * 1.2)}h.`,
-        descAr: `« ${eq.name} » يسجل MTTR بقيمة ${fmt1(eq.mttr!)}س (${(eq.mttr! / avgMttr).toFixed(1)}× متوسط الأسطول). كوّن مخزوناً من قطع الغيار وأعد تأهيل الفنيين على إجراءات التدخل السريع لخفض هذا الزمن إلى ما دون ${fmt1(avgMttr * 1.2)}س.`,
+        fr: `Réduire le délai de remise en service des équipements concernés`,
+        ar: `تقليص زمن إعادة المعدات المعنية إلى الخدمة`,
+        descFr: `${highMttrDetailsFr}. Constituez un stock de pièces dédié et préparez les techniciens aux interventions rapides pour ramener ces délais sous ${fmt1(avgMttr * 1.2)} heures.`,
+        descAr: `${highMttrDetailsAr}. كوّن مخزوناً مخصصاً من قطع الغيار وجهز الفنيين للتدخل السريع لخفض هذه الأزمنة إلى أقل من ${fmt1(avgMttr * 1.2)} ساعة.`,
       });
     }
   }
 
-  // Excellent performers — reinforce and replicate
   const excellent = valid.filter(e => e.disponibilite! >= 95);
   if (excellent.length > 0 && recs.length < 6) {
     const namesFr = excellent.map(e => `« ${e.name} »`).join(", ");
@@ -279,19 +275,18 @@ export function generateMaintenanceRecommendations(results: MaintenanceResults):
       icon: "✅",
       fr: `Maintenir les bonnes pratiques pour ${namesFr}`,
       ar: `الحفاظ على الممارسات الجيدة لـ ${namesAr}`,
-      descFr: `${excellent.length > 1 ? "Ces équipements affichent" : "Cet équipement affiche"} une disponibilité ≥ 95% — résultat d'une maintenance rigoureuse. Continuez les révisions planifiées et documentez les pratiques actuelles pour les répliquer sur les équipements moins performants.`,
-      descAr: `${excellent.length > 1 ? "هذه المعدات تسجل" : "هذه المعدة تسجل"} توافرية ≥ 95% — نتيجة لصيانة دقيقة ومنتظمة. حافظ على جدول المراجعات المقررة ووثّق الممارسات الحالية لتطبيقها على المعدات الأقل أداءً.`,
+      descFr: `${excellent.length > 1 ? "Ces équipements affichent" : "Cet équipement affiche"} une disponibilité d'au moins 95%. Conservez les révisions planifiées et documentez les pratiques qui limitent les arrêts afin de les reproduire sur les équipements moins performants.`,
+      descAr: `${excellent.length > 1 ? "هذه المعدات تسجل" : "هذه المعدة تسجل"} توافرية لا تقل عن 95%. حافظ على المراجعات المقررة ووثق الممارسات التي تحد من التوقفات لتطبيقها على المعدات الأقل أداءً.`,
     });
   }
 
-  // All healthy — no weak equipment
   if (recs.length === 0) {
     recs.push({
       icon: "✅",
       fr: "Flotte en bonne santé — maintenir la vigilance",
       ar: "الأسطول في حالة جيدة — الحفاظ على اليقظة",
-      descFr: "Tous les équipements affichent une disponibilité ≥ 90%. Maintenez les plannings de maintenance préventive actuels et mettez en place un tableau de bord de suivi mensuel pour anticiper toute dérive des indicateurs.",
-      descAr: "جميع المعدات تسجل توافرية ≥ 90%. حافظ على برامج الصيانة الوقائية الحالية وأنشئ لوحة متابعة شهرية لاستباق أي انجراف في المؤشرات.",
+      descFr: "Tous les équipements affichent une disponibilité d'au moins 90%. Maintenez les plannings de maintenance préventive actuels et mettez en place un suivi mensuel pour anticiper toute dérive des indicateurs.",
+      descAr: "جميع المعدات تسجل توافرية لا تقل عن 90%. حافظ على برامج الصيانة الوقائية الحالية وأنشئ متابعة شهرية لاستباق أي انحراف في المؤشرات.",
     });
   }
 
