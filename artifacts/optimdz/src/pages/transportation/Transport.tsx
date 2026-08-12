@@ -597,105 +597,76 @@ function TransportAnalysis({
   const totalRoutes = problem.sources.length * problem.destinations.length;
   const altN = modiResult.alternativeOptimaCells.length;
 
-  // ── Situational analysis — 3 flowing paragraphs ───────────────────────────
+  const destinationPlans = problem.destinations.map((destination, j) => {
+    const routes = activeRoutes.filter(route => route.j === j);
+    const detail = routes.length > 0
+      ? routes.map(route => `${route.sourceName} → ${destination.name}: ${fmt(route.allocation, language)} ${t("unités", "وحدة")} à ${fmt(route.unitCost, language)} ${t("DZD/unité", "دج/وحدة")} (${fmt(route.allocation * route.unitCost, language)} ${t("DZD", "دج")})`).join(", ")
+      : t("aucune liaison active", "لا يوجد مسار نشط");
+    return `${destination.name} (${fmt(destination.demand, language)} ${t("unités demandées", "وحدة مطلوبة")}) : ${detail}`;
+  });
+  const routePlanText = destinationPlans.join("; ");
+  const highestCostRoute = routeShares[0];
+  const highCostRoutes = highestCostRoute
+    ? routeShares.filter(route => route.cost >= highestCostRoute.cost * 0.75)
+    : [];
+  const highCostRouteText = highCostRoutes
+    .map(route => `${route.sourceName} → ${route.destName} (${fmt(route.allocation, language)} ${t("unités", "وحدة")}, ${fmt(route.unitCost, language)} ${t("DZD/unité", "دج/وحدة")}, ${fmt(route.cost, language)} ${t("DZD", "دج")})`)
+    .join("; ");
+
+  // ── Situational analysis — short, connected manager-facing paragraphs ──────
   const analysisLines: { icon: string; text: string; color: string }[] = [
     {
-      // ¶1 — Overall solution quality
       icon: "🚛",
       color: "bg-primary/10 border-primary/30",
       text: t(
         (() => {
           const balance = isBalanced
-            ? `une offre totale de ${fmt(totalSupply, language)} unités parfaitement équilibrée à la demande`
-            : `une offre de ${fmt(totalSupply, language)} unités face à une demande de ${fmt(totalDemand, language)} — le déséquilibre a été corrigé automatiquement`;
+            ? `L'offre totale de ${fmt(totalSupply, language)} unités couvre exactement la demande de ${fmt(totalDemand, language)} unités`
+            : `l'offre de ${fmt(totalSupply, language)} unités est comparée à une demande de ${fmt(totalDemand, language)}, avec l'ajustement nécessaire intégré au réseau`;
           const modiNote = improvement > 0
-            ? `En ${totalIters} itération${totalIters > 1 ? "s" : ""}, MODI a ensuite affiné ce plan, réduisant le ${isMax ? "profit initial" : "coût initial"} de ${improvement.toFixed(1)}% pour atteindre ${fmt(modiResult.finalCost, language)} DZD${savings > 0 ? ` — une économie nette de ${fmt(savings, language)} DZD` : ""}.`
-            : `MODI a confirmé cette solution comme globalement optimale sans aucune itération supplémentaire.`;
-          return `Le réseau "${problem.name}" couvre ${problem.sources.length} source${problem.sources.length > 1 ? "s" : ""} et ${problem.destinations.length} destination${problem.destinations.length > 1 ? "s" : ""} avec ${balance}. Parmi les trois méthodes d'initialisation testées, ${METHOD_META[bestMethod].shortFr} produit la meilleure solution de départ à ${fmt(initialCost, language)} DZD. ${modiNote} Le plan optimal retenu ${isMax ? "maximise le profit" : "minimise le coût"} à ${fmt(modiResult.finalCost, language)} DZD en activant ${activeRoutes.length} liaison${activeRoutes.length > 1 ? "s" : ""} sur les ${totalRoutes} possibles du réseau.`;
+            ? `Après ${totalIters} étape${totalIters > 1 ? "s" : ""} d'amélioration, la méthode MODI fait passer le ${isMax ? "résultat initial" : "coût initial"} de ${fmt(initialCost, language)} DZD à ${fmt(modiResult.finalCost, language)}, soit ${improvement.toFixed(1)} % d'amélioration${savings > 0 ? ` et ${fmt(savings, language)} DZD économisés` : ""}.`
+            : `La méthode MODI confirme directement cette solution comme optimale, sans amélioration supplémentaire.`;
+          return `Le plan "${problem.name}" organise ${problem.sources.length} source${problem.sources.length > 1 ? "s" : ""} vers ${problem.destinations.length} destination${problem.destinations.length > 1 ? "s" : ""}; ${balance}. ${modiNote} Le résultat retenu ${isMax ? "maximise la valeur" : "minimise le coût"} à ${fmt(modiResult.finalCost, language)} DZD en utilisant ${activeRoutes.length} liaison${activeRoutes.length > 1 ? "s" : ""} actives sur ${totalRoutes}.`;
         })(),
         (() => {
           const balance = isBalanced
-            ? `عرض إجمالي ${fmt(totalSupply, language)} وحدة يتوازن تماماً مع الطلب`
-            : `عرض ${fmt(totalSupply, language)} وحدة في مقابل طلب ${fmt(totalDemand, language)} — تم تصحيح الاختلال تلقائياً`;
+            ? `إجمالي العرض البالغ ${fmt(totalSupply, language)} وحدة يغطي الطلب البالغ ${fmt(totalDemand, language)} وحدة تماماً`
+            : `العرض البالغ ${fmt(totalSupply, language)} وحدة يُقارن بطلب قدره ${fmt(totalDemand, language)} وحدة، مع إدراج التعديل اللازم في الشبكة`;
           const modiNote = improvement > 0
-            ? `في ${totalIters} تكرار${totalIters > 1 ? "ات" : ""}، حسّنت MODI هذا الحل بنسبة ${improvement.toFixed(1)}% ليبلغ ${fmt(modiResult.finalCost, language)} دج${savings > 0 ? ` — وفراً صافياً قدره ${fmt(savings, language)} دج` : ""}.`
-            : `أكدت MODI هذا الحل باعتباره مثالياً عاماً دون أي تكرار إضافي.`;
-          return `شبكة "${problem.name}" تغطي ${problem.sources.length} مصادر و${problem.destinations.length} وجهات، مع ${balance}. من بين الطرق الثلاث المقارنة، أعطت ${METHOD_META[bestMethod].shortFr} أفضل نقطة انطلاق بتكلفة ${fmt(initialCost, language)} دج. ${modiNote} الخطة المُعتمدة ${isMax ? "تعظّم الربح" : "تُقلّل التكلفة"} إلى ${fmt(modiResult.finalCost, language)} دج عبر ${activeRoutes.length} من أصل ${totalRoutes} مسار ممكن في الشبكة.`;
+            ? `بعد ${totalIters} خطوة تحسين، نقلت طريقة MODI ${isMax ? "النتيجة الأولية" : "التكلفة الأولية"} من ${fmt(initialCost, language)} دج إلى ${fmt(modiResult.finalCost, language)} دج، بتحسن قدره ${improvement.toFixed(1)}%${savings > 0 ? ` وتوفير ${fmt(savings, language)} دج` : ""}.`
+            : `أكدت طريقة MODI مباشرة أن الحل مثالي دون تحسين إضافي.`;
+          return `تنظم خطة "${problem.name}" التوزيع من ${problem.sources.length} مصادر إلى ${problem.destinations.length} وجهات؛ ${balance}. ${modiNote} والنتيجة المعتمدة ${isMax ? "تعظّم القيمة" : "تقلّل التكلفة"} إلى ${fmt(modiResult.finalCost, language)} دج عبر ${activeRoutes.length} مسارات نشطة من أصل ${totalRoutes}.`;
         })()
       ),
     },
-    ...(routeShares.length > 0 ? [{
-      // ¶2 — Cost breakdown by route
-      icon: "📊",
+    {
+      icon: "📦",
       color: "bg-secondary/10 border-secondary/30",
       text: t(
-        (() => {
-          const r0 = routeShares[0];
-          const p0 = routePct(r0.cost);
-          const costWord = isMax ? "profit" : "coût";
-          let txt = `La liaison ${r0.sourceName} → ${r0.destName} est la plus ${isMax ? "rentable" : "coûteuse"} du plan : ${fmt(r0.allocation, language)} unités transportées à ${fmt(r0.unitCost, language)} DZD/unité représentent ${fmt(r0.cost, language)} DZD, soit ${p0}% du ${costWord} total optimal.`;
-          if (routeShares.length >= 2) {
-            const r1 = routeShares[1];
-            const p1 = routePct(r1.cost);
-            txt += ` La liaison suivante, ${r1.sourceName} → ${r1.destName}, contribue ${p1}% (${fmt(r1.cost, language)} DZD) — ces deux liaisons concentrent ensemble ${p0 + p1}% du flux.`;
-          }
-          if (routeShares.length >= 3) {
-            const others = routeShares.slice(2);
-            const otherPct = others.reduce((s, r) => s + routePct(r.cost), 0);
-            txt += ` Les ${others.length} liaison${others.length > 1 ? "s" : ""} restante${others.length > 1 ? "s" : ""} se partagent les ${otherPct}% restants.`;
-          }
-          txt += ` ${isMax ? "Renforcer les volumes sur les liaisons à fort rendement amplifiera directement le résultat." : "Négocier le tarif unitaire sur la liaison dominante est le levier de réduction budgétaire le plus direct."}`;
-          return txt;
-        })(),
-        (() => {
-          const r0 = routeShares[0];
-          const p0 = routePct(r0.cost);
-          const costWord = isMax ? "الربح" : "التكلفة";
-          let txt = `المسار ${r0.sourceName} → ${r0.destName} هو الأكثر ${isMax ? "ربحية" : "تكلفة"} في الخطة: نقل ${fmt(r0.allocation, language)} وحدة بسعر ${fmt(r0.unitCost, language)} دج/وحدة يُولّد ${fmt(r0.cost, language)} دج، أي ${p0}% من إجمالي ${costWord} المثالي.`;
-          if (routeShares.length >= 2) {
-            const r1 = routeShares[1];
-            const p1 = routePct(r1.cost);
-            txt += ` المسار التالي، ${r1.sourceName} → ${r1.destName}، يُمثّل ${p1}% إضافية (${fmt(r1.cost, language)} دج) — وهذان المساران يجمعان معاً ${p0 + p1}% من التدفق الكلي.`;
-          }
-          if (routeShares.length >= 3) {
-            const others = routeShares.slice(2);
-            const otherPct = others.reduce((s, r) => s + routePct(r.cost), 0);
-            txt += ` تتقاسم المسارات الـ${others.length} المتبقية نسبة ${otherPct}% الباقية.`;
-          }
-          txt += ` ${isMax ? "تعزيز حجم التدفق على المسارات عالية العائد سيُضاعف الربح مباشرة." : "إعادة التفاوض على السعر الوحدوي للمسار المهيمن هو أكثر الأدوات أثراً على الميزانية الإجمالية."}`;
-          return txt;
-        })()
+        `Concrètement, le plan recommande de servir chaque destination comme suit : ${routePlanText}. Cette répartition transforme le résultat mathématique en consignes d'expédition : chaque entrepôt ou usine envoie les quantités indiquées au client correspondant, sans dépasser les capacités ni laisser la demande planifiée sans couverture.`,
+        `عملياً، توصي الخطة بخدمة كل وجهة كما يلي: ${routePlanText}. يحول هذا التوزيع النتيجة الحسابية إلى تعليمات شحن واضحة؛ يرسل كل مستودع أو مصنع الكميات المحددة إلى العميل المقابل دون تجاوز الطاقات أو ترك الطلب المخطط دون تغطية.`
       ),
-    }] : []),
-    ...(modiResult.hasAlternativeOptima || modiResult.degeneracyHandled ? [{
-      // ¶3 — Alternatives / degeneracy
-      icon: modiResult.hasAlternativeOptima ? "🔀" : "⚠️",
-      color: modiResult.hasAlternativeOptima ? "bg-blue-50 border-blue-300" : "bg-amber-50 border-amber-300",
+    },
+    ...(routeShares.length > 0 ? [{
+      icon: "📊",
+      color: "bg-amber-50 border-amber-300",
       text: t(
-        (() => {
-          let txt = "";
-          if (modiResult.hasAlternativeOptima) {
-            txt += `Le solveur a identifié ${altN} plan${altN > 1 ? "s" : ""} de distribution alternatif${altN > 1 ? "s" : ""} atteignant exactement le même ${isMax ? "profit" : "coût"} optimal de ${fmt(modiResult.finalCost, language)} DZD. Cette flexibilité est un atout opérationnel : si une liaison prioritaire subit une contrainte (congestion, délai, surcharge), l'un de ces plans alternatifs peut être adopté sans aucune pénalité de ${isMax ? "profit" : "coût"}.`;
-          }
-          if (modiResult.degeneracyHandled) {
-            if (txt) txt += " ";
-            txt += `La solution initiale présentait un phénomène de dégénérescence — résolu automatiquement pour garantir la convergence. Ce cas n'affecte pas la qualité du résultat final, mais peut signaler des contraintes redondantes dans votre réseau.`;
-          }
-          return txt;
-        })(),
-        (() => {
-          let txt = "";
-          if (modiResult.hasAlternativeOptima) {
-            txt += `رصد المحلّل ${altN} خطة${altN > 1 ? " توزيع بديلة" : " توزيع بديلة"} تُحقق نفس ${isMax ? "الربح" : "التكلفة"} المثالي البالغ ${fmt(modiResult.finalCost, language)} دج بالضبط. هذه المرونة ميزة تشغيلية قيّمة: إذا تعذّر تشغيل مسار رئيسي (ازدحام، تأخير، طاقة زائدة)، يمكن اعتماد إحدى الخطط البديلة دون أي خسارة في ${isMax ? "الربح" : "الكفاءة"}.`;
-          }
-          if (modiResult.degeneracyHandled) {
-            if (txt) txt += " ";
-            txt += `الحل الأولي كان متدهوراً (عدد متغيرات الأساس غير كافٍ) — وقد عولج تلقائياً لضمان التقارب. هذه الحالة لا تؤثر على جودة النتيجة النهائية، غير أنها قد تُشير إلى قيود زائدة في شبكة التوزيع.`;
-          }
-          return txt;
-        })()
+        `Les liaisons qui pèsent le plus dans la facture sont ${highCostRouteText}. La plus coûteuse est ${highestCostRoute!.sourceName} → ${highestCostRoute!.destName}, avec ${fmt(highestCostRoute!.cost, language)} DZD, soit ${routePct(highestCostRoute!.cost)} % du total. Si ce niveau est difficile à tenir, négociez d'abord le tarif unitaire de cette liaison et étudiez une réaffectation vers une source moins chère sans modifier les quantités demandées.`,
+        `المسارات الأكثر تأثيراً في فاتورة النقل هي ${highCostRouteText}. وأكثرها تكلفة هو ${highestCostRoute!.sourceName} → ${highestCostRoute!.destName} بقيمة ${fmt(highestCostRoute!.cost, language)} دج، أي ${routePct(highestCostRoute!.cost)}% من الإجمالي. إذا كان هذا المستوى مرتفعاً، فابدأ بإعادة التفاوض على السعر الوحدوي لهذا المسار وادرس التحويل إلى مصدر أقل تكلفة دون تغيير الكميات المطلوبة.`
       ),
     }] : []),
+    {
+      icon: modiResult.hasAlternativeOptima ? "🔀" : "✅",
+      color: modiResult.hasAlternativeOptima ? "bg-blue-50 border-blue-300" : "bg-green-50 border-green-300",
+      text: t(
+        modiResult.hasAlternativeOptima
+          ? `La solution est optimale, mais pas unique : ${altN} liaison${altN > 1 ? "s" : ""} alternative${altN > 1 ? "s" : ""} peut${altN > 1 ? "vent" : ""} être utilisée${altN > 1 ? "s" : ""} au même coût de ${fmt(modiResult.finalCost, language)} DZD. Le choix pratique peut donc privilégier la fiabilité, les délais ou la disponibilité d'un entrepôt sans pénalité budgétaire.`
+          : `La solution est pleinement optimale et unique selon les coûts fournis : aucune autre répartition testée n'atteint ${fmt(modiResult.finalCost, language)} DZD. Il est donc pertinent d'appliquer ce plan, puis de le recalculer si un coût, une capacité ou une demande change.`,
+        modiResult.hasAlternativeOptima
+          ? `الحل مثالي لكنه ليس وحيداً: يمكن استخدام ${altN} مسارات بديلة بنفس التكلفة البالغة ${fmt(modiResult.finalCost, language)} دج. لذلك يمكن أن يعطي القرار العملي الأولوية للموثوقية أو المهل أو توفر المستودع دون تكلفة إضافية.`
+          : `الحل مثالي وفريد وفق التكاليف المقدمة: لا يصل أي توزيع آخر إلى ${fmt(modiResult.finalCost, language)} دج. لذلك يُنصح بتطبيق هذه الخطة وإعادة حسابها إذا تغيرت تكلفة أو طاقة أو كمية طلب.`
+      ),
+    },
   ];
 
   // ── Recommendations ─────────────────────────────────────────────────────────
