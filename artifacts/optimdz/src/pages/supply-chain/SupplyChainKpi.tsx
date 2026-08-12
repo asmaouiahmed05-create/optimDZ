@@ -242,71 +242,109 @@ export default function SupplyChainKpi() {
   function buildAnalysisLines(res: ScKpiResults): string[] {
     const lines: string[] = [];
 
+    const rotationValue = res.tauxRotation
+      ? `${res.tauxRotation.value.toFixed(2)} ${t("fois", "مرة")}`
+      : null;
+    const overview: string[] = [];
     if (res.tauxRotation) {
-      const v = res.tauxRotation.value.toFixed(2);
-      if (res.tauxRotation.status === "good") {
-        lines.push(t(
-          `✅ Le taux de rotation des stocks est excellent (${v}×), supérieur au seuil cible de 6×. Les stocks tournent rapidement, minimisant les coûts de possession.`,
-          `✅ معدل دوران المخزون ممتاز (${v}×)، أعلى من المعيار المرجعي البالغ ٦×. يتجدد المخزون بسرعة مما يخفّض تكاليف الاحتفاظ.`,
-        ));
-      } else if (res.tauxRotation.status === "medium") {
-        lines.push(t(
-          `⚠️ Le taux de rotation (${v}×) est dans la plage acceptable (2–6×) mais peut être amélioré. Un suivi plus rigoureux des niveaux de stock est recommandé.`,
-          `⚠️ معدل الدوران (${v}×) مقبول (٢–٦×) لكنه قابل للتحسين. يُنصح بمراقبة أدق لمستويات المخزون.`,
-        ));
-      } else {
-        lines.push(t(
-          `🔴 Le taux de rotation (${v}×) est en dessous du seuil minimal de 2×. Cela indique un stock excédentaire ou une demande insuffisante. Une révision des politiques d'achat s'impose.`,
-          `🔴 معدل الدوران (${v}×) دون الحد الأدنى البالغ ٢×. يشير ذلك إلى فائض في المخزون أو ضعف في الطلب. يجب مراجعة سياسات الشراء.`,
-        ));
-      }
+      overview.push(t(`un taux de rotation de ${rotationValue}`, `معدل دوران قدره ${rotationValue}`));
     }
-
     if (res.tauxService) {
-      const v = fPct(res.tauxService.value);
-      if (res.tauxService.status === "good") {
-        lines.push(t(
-          `✅ Le taux de service (${v}) dépasse le seuil excellent de 95%. Les clients reçoivent leurs commandes à temps, renforçant la satisfaction et la fidélité.`,
-          `✅ نسبة الخدمة (${v}) تتجاوز المعيار الجيد البالغ ٩٥%. يتلقى العملاء طلباتهم في الوقت المحدد مما يعزز الرضا والولاء.`,
-        ));
-      } else if (res.tauxService.status === "medium") {
-        lines.push(t(
-          `⚠️ Le taux de service (${v}) se situe entre 90% et 95%. Des efforts supplémentaires sont nécessaires pour atteindre l'excellence opérationnelle.`,
-          `⚠️ نسبة الخدمة (${v}) بين ٩٠% و٩٥%. تحتاج إلى جهود إضافية لبلوغ مستوى التميز التشغيلي.`,
-        ));
-      } else {
-        lines.push(t(
-          `🔴 Le taux de service (${v}) est inférieur à 90%, ce qui est préoccupant. Des ruptures fréquentes ou des retards impactent la satisfaction client et la compétitivité.`,
-          `🔴 نسبة الخدمة (${v}) أقل من ٩٠%، وهذا مقلق. الانقطاعات المتكررة أو التأخير يؤثران على رضا العملاء والتنافسية.`,
-        ));
-      }
+      overview.push(t(
+        `un niveau de service de ${fPct(res.tauxService.value)}`,
+        `نسبة خدمة قدرها ${fPct(res.tauxService.value)}`,
+      ));
     }
-
     if (res.coutTotal) {
+      overview.push(t(
+        `un coût d'approvisionnement de ${fDA(res.coutTotal.value)}`,
+        `تكلفة إمداد قدرها ${fDA(res.coutTotal.value)}`,
+      ));
+    }
+    if (res.tauxRupture) {
+      overview.push(t(
+        `un taux de rupture de ${fPct(res.tauxRupture.value)}`,
+        `نسبة نقص قدرها ${fPct(res.tauxRupture.value)}`,
+      ));
+    }
+    if (overview.length > 0) {
       lines.push(t(
-        `📊 Le coût d'approvisionnement total s'élève à ${fDA(res.coutTotal.value)} pour la période analysée. La décomposition permet d'identifier les postes les plus coûteux et de cibler les optimisations.`,
-        `📊 بلغت تكلفة الإمداد الإجمالية ${fDA(res.coutTotal.value)} خلال الفترة المحللة. يتيح التفصيل تحديد أكثر البنود تكلفةً والتركيز على تحسينها.`,
+        `Sur la période analysée, la chaîne présente ${overview.join(", ")}. Cette lecture donne une vue d'ensemble de l'équilibre entre la vitesse d'écoulement des stocks, la qualité de service, le coût engagé et la disponibilité des produits.`,
+        `خلال الفترة المحللة، تُظهر السلسلة ${overview.join("، ")}. وتقدم هذه القراءة صورة عامة عن التوازن بين سرعة تصريف المخزون وجودة الخدمة والتكلفة المتكبدة وتوافر المنتجات.`,
       ));
     }
 
-    if (res.tauxRupture) {
-      const v = fPct(res.tauxRupture.value);
-      if (res.tauxRupture.status === "good") {
-        lines.push(t(
-          `✅ Le taux de rupture (${v}) est maîtrisé — inférieur au seuil cible de 1%. La disponibilité des produits est assurée avec une excellente fiabilité.`,
-          `✅ نسبة النقص (${v}) متحكَّم فيها — دون عتبة ١%. توافر المنتجات مضمون بموثوقية ممتازة.`,
-        ));
-      } else if (res.tauxRupture.status === "medium") {
-        lines.push(t(
-          `⚠️ Le taux de rupture (${v}) est entre 1% et 5%. Des efforts préventifs (stocks de sécurité, meilleure prévision) permettraient de réduire les indisponibilités.`,
-          `⚠️ نسبة النقص (${v}) بين ١% و٥%. الجهود الوقائية (مخزون أمان، تحسين التنبؤ) ستُخفّض حالات عدم التوفر.`,
-        ));
-      } else {
-        lines.push(t(
-          `🔴 Le taux de rupture (${v}) dépasse 5%, niveau inacceptable. Des ruptures fréquentes engendrent des ventes perdues, une insatisfaction client et des coûts d'urgence élevés.`,
-          `🔴 نسبة النقص (${v}) تتجاوز ٥%، وهو مستوى غير مقبول. يسبب النقص المتكرر ضياع المبيعات وعدم رضا العملاء وتكاليف طوارئ مرتفعة.`,
-        ));
-      }
+    const belowTarget: string[] = [];
+    if (res.tauxRotation && res.tauxRotation.status !== "good") {
+      belowTarget.push(t(
+        `la rotation à ${rotationValue}, ce qui signifie qu'une part du stock reste immobilisée trop longtemps et pèse sur les liquidités`,
+        `الدوران عند ${rotationValue}، مما يعني أن جزءاً من المخزون يبقى راكداً فترة أطول ويضغط على السيولة`,
+      ));
+    }
+    if (res.tauxService && res.tauxService.status !== "good") {
+      belowTarget.push(t(
+        `le service à ${fPct(res.tauxService.value)}, ce qui expose les clients à des retards ou à des livraisons incomplètes`,
+        `الخدمة عند ${fPct(res.tauxService.value)}، مما يعرّض العملاء للتأخير أو التسليم غير الكامل`,
+      ));
+    }
+    if (res.tauxRupture && res.tauxRupture.status !== "good") {
+      belowTarget.push(t(
+        `les ruptures à ${fPct(res.tauxRupture.value)}, ce qui signale des indisponibilités susceptibles de provoquer des ventes perdues et des expéditions urgentes`,
+        `النقص عند ${fPct(res.tauxRupture.value)}، مما يشير إلى عدم توفر قد يؤدي إلى خسارة مبيعات وشحنات عاجلة`,
+      ));
+    }
+    if (belowTarget.length > 0) {
+      const availabilityRisk = res.tauxRupture?.status !== "good" || res.tauxService?.status !== "good";
+      lines.push(t(
+        `Les indicateurs qui demandent une action sont ${belowTarget.join(" ; ")}. Pour la performance de la chaîne, cela traduit ${availabilityRisk ? "un risque sur la disponibilité client" : "une immobilisation excessive du stock"} et justifie une intervention ciblée plutôt qu'une action générale.`,
+        `المؤشرات التي تتطلب تدخلاً هي ${belowTarget.join("؛ ")}. وبالنسبة لأداء السلسلة، يعكس ذلك ${availabilityRisk ? "خطراً على توافر المنتجات للعملاء" : "تجميداً مفرطاً للمخزون"}، ولذلك يلزم تدخل مركز بدلاً من إجراء عام.`,
+      ));
+    }
+
+    const performingWell: string[] = [];
+    if (res.tauxRotation?.status === "good") {
+      performingWell.push(t(
+        `la rotation à ${rotationValue}, qui indique un écoulement rapide du stock`,
+        `الدوران عند ${rotationValue}، وهو ما يدل على تصريف سريع للمخزون`,
+      ));
+    }
+    if (res.tauxService?.status === "good") {
+      performingWell.push(t(
+        `le service à ${fPct(res.tauxService.value)}, qui protège la ponctualité des livraisons`,
+        `الخدمة عند ${fPct(res.tauxService.value)}، وهو ما يدعم انتظام التسليمات`,
+      ));
+    }
+    if (res.tauxRupture?.status === "good") {
+      performingWell.push(t(
+        `les ruptures à ${fPct(res.tauxRupture.value)}, qui montrent que la disponibilité est bien maîtrisée`,
+        `النقص عند ${fPct(res.tauxRupture.value)}، وهو ما يثبت التحكم الجيد في توافر المنتجات`,
+      ));
+    }
+    if (performingWell.length > 0) {
+      lines.push(t(
+        `Les points forts sont ${performingWell.join(" ; ")}. Ils donnent à la chaîne une base opérationnelle solide et permettent de concentrer les moyens d'amélioration sur les indicateurs en retrait.`,
+        `وتتمثل نقاط القوة في ${performingWell.join("؛ ")}. وهذا يمنح السلسلة أساساً تشغيلياً متيناً ويسمح بتوجيه جهود التحسين إلى المؤشرات المتراجعة.`,
+      ));
+    } else if (overview.length > 0) {
+      lines.push(t(
+        "Aucun des indicateurs de performance analysés n'atteint actuellement sa cible. La priorité doit donc aller à l'indicateur le plus faible, tout en protégeant les niveaux de service déjà obtenus.",
+        "لا يحقق أي من مؤشرات الأداء المحللة هدفه حالياً. لذلك يجب توجيه الأولوية إلى المؤشر الأضعف مع الحفاظ على مستويات الخدمة المحققة.",
+      ));
+    }
+
+    const storageCost = res.coutTotal?.breakdown.coutStockage ?? 0;
+    if (res.coutTotal && storageCost > 0) {
+      lines.push(t(
+        `Le coût de possession du stock représente ${fDA(storageCost)} dans le coût d'approvisionnement total de ${fDA(res.coutTotal.value)}. Ce montant mérite d'être rapproché de la rotation : si les stocks restent longtemps en magasin, une réduction des quantités ou une meilleure synchronisation des achats peut libérer du cash sans dégrader le service.`,
+        `تمثل تكلفة الاحتفاظ بالمخزون ${fDA(storageCost)} من إجمالي تكلفة الإمداد البالغة ${fDA(res.coutTotal.value)}. ويجب ربط هذا المبلغ بمعدل الدوران: فإذا بقي المخزون طويلاً في المستودع، فإن خفض الكميات أو تحسين توقيت الشراء قد يحرر السيولة دون الإضرار بالخدمة.`,
+      ));
+    }
+
+    if (lines.length === 0) {
+      lines.push(t(
+        "Aucune donnée exploitable n'est disponible pour formuler une lecture managériale.",
+        "لا تتوفر بيانات قابلة للاستغلال لصياغة قراءة إدارية.",
+      ));
     }
 
     return lines;
@@ -316,23 +354,36 @@ export default function SupplyChainKpi() {
   function buildRecommendations(res: ScKpiResults) {
     const recos: { icon: string; title: string; desc: string }[] = [];
 
-    if (res.tauxRotation?.status !== "good") {
+    const availabilityNeedsAction =
+      res.tauxService?.status !== "good" || res.tauxRupture?.status !== "good";
+    if (availabilityNeedsAction) {
+      const serviceValue = res.tauxService ? fPct(res.tauxService.value) : null;
+      const ruptureValue = res.tauxRupture ? fPct(res.tauxRupture.value) : null;
+      const weakestAvailability = [
+        res.tauxService ? { key: "service", score: res.tauxService.score } : null,
+        res.tauxRupture ? { key: "rupture", score: res.tauxRupture.score } : null,
+      ]
+        .filter((metric): metric is { key: string; score: number } => metric !== null)
+        .sort((a, b) => a.score - b.score)[0]?.key;
+      const availabilityTitle = weakestAvailability === "rupture"
+        ? t("Priorité — réduire les ruptures", "الأولوية — تقليل حالات النقص")
+        : t("Priorité — relever le niveau de service", "الأولوية — رفع مستوى الخدمة");
       recos.push({
-        icon: "🔄",
-        title: t("Optimiser la rotation des stocks", "تحسين دوران المخزون"),
+        icon: "🎯",
+        title: availabilityTitle,
         desc: t(
-          "Revoyez les quantités commandées en appliquant la méthode EOQ. Identifiez les articles à faible rotation et réduisez les stocks dormants via des promotions ou retours fournisseur.",
-          "راجع الكميات المطلوبة بتطبيق طريقة EOQ. حدّد المواد بطيئة الحركة وخفّض المخزون الراكد عبر العروض أو الإرجاع إلى المورد.",
+          `Priorisez le suivi des commandes en retard et des articles indisponibles${serviceValue ? ` : le service est à ${serviceValue}` : ""}${ruptureValue ? ` et les ruptures à ${ruptureValue}` : ""}. Ajustez les stocks de sécurité des références critiques, confirmez les délais fournisseurs chaque semaine et déclenchez le réapprovisionnement avant la rupture. Cette action traite ensemble la fiabilité de livraison et la disponibilité, sans répéter la même consigne sur deux indicateurs.`,
+          `أعط الأولوية لمتابعة الطلبيات المتأخرة والمواد غير المتاحة${serviceValue ? `: نسبة الخدمة عند ${serviceValue}` : ""}${ruptureValue ? ` ونسبة النقص عند ${ruptureValue}` : ""}. عدّل مخزون الأمان للمواد الحيوية، وأكد آجال الموردين أسبوعياً، وابدأ التزويد قبل حدوث النقص. يعالج هذا الإجراء موثوقية التسليم وتوافر المنتجات معاً دون تكرار نفس التوجيه على مؤشرين.`,
         ),
       });
     }
-    if (res.tauxService?.status !== "good") {
+    if (res.tauxRotation && res.tauxRotation.status !== "good") {
       recos.push({
-        icon: "🎯",
-        title: t("Améliorer le taux de service", "رفع نسبة الخدمة"),
+        icon: "🔄",
+        title: t("Accélérer la rotation des stocks", "تسريع دوران المخزون"),
         desc: t(
-          "Analysez les causes racines des retards (délais fournisseurs, ruptures, erreurs de traitement). Renforcez les stocks de sécurité des articles critiques et améliorez la coordination avec les fournisseurs clés.",
-          "حلّل الأسباب الجذرية للتأخير (مهل الموردين، النقص، أخطاء المعالجة). عزّز مخزون الأمان للعناصر الحيوية وحسّن التنسيق مع الموردين الرئيسيين.",
+          `Le taux de rotation est de ${res.tauxRotation.value.toFixed(2)} fois. Réduisez les quantités des références lentes, rapprochez les achats de la demande réelle et écoulez en priorité les stocks anciens afin de limiter l'argent immobilisé sans affaiblir le service.`,
+          `معدل دوران المخزون هو ${res.tauxRotation.value.toFixed(2)} مرة. خفّض كميات المواد بطيئة الحركة، وقرّب المشتريات من الطلب الفعلي، وصرف المخزون الأقدم أولاً للحد من الأموال المجمدة دون إضعاف الخدمة.`,
         ),
       });
     }
@@ -350,18 +401,8 @@ export default function SupplyChainKpi() {
         icon: "💰",
         title: t("Réduire les coûts d'approvisionnement", "خفض تكاليف الإمداد"),
         desc: t(
-          `Le poste le plus important est ${costFocus}. Négociez des contrats cadres avec les fournisseurs, optimisez les tournées de livraison et mutualisez les commandes pour réaliser des économies d'échelle.`,
-          `البند الأعلى تكلفةً هو ${costFocus}. تفاوض على عقود إطارية مع الموردين، حسّن مسارات التسليم ودمج الطلبات لتحقيق وفورات الحجم.`,
-        ),
-      });
-    }
-    if (res.tauxRupture?.status !== "good") {
-      recos.push({
-        icon: "📦",
-        title: t("Réduire les ruptures de stock", "تقليل حالات النقص"),
-        desc: t(
-          "Mettez en place une surveillance en temps réel des niveaux de stock. Appliquez le point de commande (ROP) pour déclencher automatiquement les réapprovisionnements avant d'atteindre le stock de sécurité.",
-          "طبّق مراقبة لحظية لمستويات المخزون. استخدم نقطة إعادة الطلب (ROP) لإطلاق التزويد تلقائياً قبل الوصول إلى مخزون الأمان.",
+          `Le coût d'approvisionnement atteint ${fDA(res.coutTotal.value)} ; le poste dominant est ${costFocus}. Concentrez la négociation, la planification des livraisons ou le regroupement des commandes sur ce poste précis, puis mesurez l'économie obtenue sur la prochaine période.`,
+          `تبلغ تكلفة الإمداد ${fDA(res.coutTotal.value)}، وأعلى بند فيها هو ${costFocus}. ركّز التفاوض أو تخطيط التسليم أو تجميع الطلبيات على هذا البند تحديداً، ثم قِس الوفر المحقق في الفترة المقبلة.`,
         ),
       });
     }
@@ -875,7 +916,7 @@ export default function SupplyChainKpi() {
               </CardHeader>
               <CardContent className="space-y-3">
                 {buildAnalysisLines(results).map((line, i) => (
-                  <div
+                  <p
                     key={i}
                     className="bg-muted/40 border border-border rounded-lg px-4 py-3 text-sm leading-relaxed"
                     dangerouslySetInnerHTML={{ __html: line }}
