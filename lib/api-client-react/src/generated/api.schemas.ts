@@ -196,6 +196,24 @@ export interface ProblemStats {
   recentProblems: SavedProblem[];
 }
 
+export type SharedHistoryInputKeyResultValues = { [key: string]: unknown };
+
+export interface SharedHistoryInput {
+  moduleName: string;
+  problemName: string;
+  keyResultValues: SharedHistoryInputKeyResultValues;
+}
+
+export type SharedHistoryKeyResultValues = { [key: string]: unknown };
+
+export interface SharedHistory {
+  id: number;
+  moduleName: string;
+  problemName: string;
+  keyResultValues: SharedHistoryKeyResultValues;
+  savedAt: string;
+}
+
 export interface TemplateVariable {
   name: string;
   nameAr: string;
@@ -226,6 +244,14 @@ export interface Template {
 
 export type ListProblemsParams = {
 sector?: string;
+limit?: number;
+};
+
+export type ListSharedHistoryParams = {
+/**
+ * @minimum 1
+ * @maximum 100
+ */
 limit?: number;
 };
 

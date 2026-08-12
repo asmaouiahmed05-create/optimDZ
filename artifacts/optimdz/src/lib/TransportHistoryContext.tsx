@@ -6,6 +6,26 @@ import React, { createContext, useContext, useState, useCallback, useEffect } fr
 import type { TransportProblem } from "./TransportContext";
 import type { MODIResult } from "./modiAlgorithm";
 
+async function writeSharedTransportHistory(saved: SavedTransportProblem): Promise<void> {
+  try {
+    await fetch("/api/shared-history", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        moduleName: "transportation",
+        problemName: saved.name,
+        keyResultValues: {
+          initialCost: saved.initialCost,
+          finalCost: saved.finalCost,
+          improvement: saved.improvement,
+        },
+      }),
+    });
+  } catch {
+    // The existing local history remains the source of truth for this module.
+  }
+}
+
 export type TransportSectorKey = "industry" | "trade" | "services" | "agriculture" | "custom";
 
 export interface SavedTransportProblem {
@@ -96,6 +116,7 @@ export function TransportHistoryProvider({ children }: { children: React.ReactNo
         improvement,
       };
       setProblems(prev => [saved, ...prev].slice(0, MAX_PROBLEMS));
+      void writeSharedTransportHistory(saved);
       return saved.id;
     },
     []

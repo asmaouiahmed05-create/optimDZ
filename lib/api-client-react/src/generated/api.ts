@@ -22,10 +22,13 @@ import type {
 import type {
   HealthStatus,
   ListProblemsParams,
+  ListSharedHistoryParams,
   ProblemInput,
   ProblemStats,
   SavedProblem,
   SavedProblemInput,
+  SharedHistory,
+  SharedHistoryInput,
   SolveResult,
   Template
 } from './api.schemas';
@@ -737,4 +740,158 @@ export function useGetTemplate<TData = Awaited<ReturnType<typeof getTemplate>>, 
 
 
 
+
+export const getListSharedHistoryUrl = (params?: ListSharedHistoryParams,) => {
+  const normalizedParams = new URLSearchParams();
+
+  Object.entries(params || {}).forEach(([key, value]) => {
+
+    if (value !== undefined) {
+      normalizedParams.append(key, value === null ? 'null' : String(value))
+    }
+  });
+
+  const stringifiedParams = normalizedParams.toString();
+
+  return stringifiedParams.length > 0 ? `/api/shared-history?${stringifiedParams}` : `/api/shared-history`
+}
+
+/**
+ * @summary List shared saved-result summaries
+ */
+export const listSharedHistory = async (params?: ListSharedHistoryParams, options?: RequestInit): Promise<SharedHistory[]> => {
+
+  return customFetch<SharedHistory[]>(getListSharedHistoryUrl(params),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getListSharedHistoryQueryKey = (params?: ListSharedHistoryParams,) => {
+    return [
+    `/api/shared-history`, ...(params ? [params] : [])
+    ] as const;
+    }
+
+
+export const getListSharedHistoryQueryOptions = <TData = Awaited<ReturnType<typeof listSharedHistory>>, TError = ErrorType<unknown>>(params?: ListSharedHistoryParams, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof listSharedHistory>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getListSharedHistoryQueryKey(params);
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof listSharedHistory>>> = ({ signal }) => listSharedHistory(params, { signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof listSharedHistory>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type ListSharedHistoryQueryResult = NonNullable<Awaited<ReturnType<typeof listSharedHistory>>>
+export type ListSharedHistoryQueryError = ErrorType<unknown>
+
+
+/**
+ * @summary List shared saved-result summaries
+ */
+
+export function useListSharedHistory<TData = Awaited<ReturnType<typeof listSharedHistory>>, TError = ErrorType<unknown>>(
+ params?: ListSharedHistoryParams, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof listSharedHistory>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getListSharedHistoryQueryOptions(params,options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return withQueryKey(query, queryOptions.queryKey);
+}
+
+
+
+
+
+
+
+export const getCreateSharedHistoryUrl = () => {
+
+
+
+
+  return `/api/shared-history`
+}
+
+/**
+ * @summary Write a shared saved-result summary
+ */
+export const createSharedHistory = async (sharedHistoryInput: SharedHistoryInput, options?: RequestInit): Promise<SharedHistory> => {
+
+  return customFetch<SharedHistory>(getCreateSharedHistoryUrl(),
+  {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    body: JSON.stringify(sharedHistoryInput)
+  }
+);}
+
+
+
+
+export const getCreateSharedHistoryMutationOptions = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof createSharedHistory>>, TError,{data: BodyType<SharedHistoryInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof createSharedHistory>>, TError,{data: BodyType<SharedHistoryInput>}, TContext> => {
+
+const mutationKey = ['createSharedHistory'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof createSharedHistory>>, {data: BodyType<SharedHistoryInput>}> = (props) => {
+          const {data} = props ?? {};
+
+          return  createSharedHistory(data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type CreateSharedHistoryMutationResult = NonNullable<Awaited<ReturnType<typeof createSharedHistory>>>
+    export type CreateSharedHistoryMutationBody = BodyType<SharedHistoryInput>
+    export type CreateSharedHistoryMutationError = ErrorType<unknown>
+
+    /**
+ * @summary Write a shared saved-result summary
+ */
+export const useCreateSharedHistory = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof createSharedHistory>>, TError,{data: BodyType<SharedHistoryInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof createSharedHistory>>,
+        TError,
+        {data: BodyType<SharedHistoryInput>},
+        TContext
+      > => {
+      return useMutation(getCreateSharedHistoryMutationOptions(options));
+    }
 

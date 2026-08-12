@@ -288,3 +288,43 @@ export const GetTemplateResponse = zod.object({
 })
 
 
+/**
+ * @summary List shared saved-result summaries
+ */
+export const listSharedHistoryQueryLimitDefault = 100;
+export const listSharedHistoryQueryLimitMax = 100;
+
+
+
+export const ListSharedHistoryQueryParams = zod.object({
+  "limit": zod.coerce.number().min(1).max(listSharedHistoryQueryLimitMax).default(listSharedHistoryQueryLimitDefault)
+})
+
+export const ListSharedHistoryResponseItem = zod.object({
+  "id": zod.number(),
+  "moduleName": zod.string(),
+  "problemName": zod.string(),
+  "keyResultValues": zod.record(zod.string(), zod.unknown()),
+  "savedAt": zod.string()
+})
+export const ListSharedHistoryResponse = zod.array(ListSharedHistoryResponseItem)
+
+
+/**
+ * @summary Write a shared saved-result summary
+ */
+export const CreateSharedHistoryBody = zod.object({
+  "moduleName": zod.string(),
+  "problemName": zod.string(),
+  "keyResultValues": zod.record(zod.string(), zod.unknown())
+})
+
+export const CreateSharedHistoryResponse = zod.object({
+  "id": zod.number(),
+  "moduleName": zod.string(),
+  "problemName": zod.string(),
+  "keyResultValues": zod.record(zod.string(), zod.unknown()),
+  "savedAt": zod.string()
+})
+
+

@@ -1,6 +1,7 @@
 import { Router } from "express";
-import { db, savedProblemsTable } from "@workspace/db";
+import { db, savedProblemsTable, writeSharedHistoryRecord } from "@workspace/db";
 import { eq, desc } from "drizzle-orm";
+import { buildSharedHistoryRecord } from "../lib/sharedHistory";
 
 const router = Router();
 
@@ -84,24 +85,39 @@ router.get("/:id", async (req, res) => {
 });
 
 router.post("/", async (req, res) => {
-  const { name, sector, problemData, result } = req.body;
+  const body = req.body as Record<string, unknown>;
+  const problemData = (body.problemData ?? body.content) as Record<string, unknown> | undefined;
+  const result = body.result ?? (problemData?.results ?? null);
+  const name = body.name ?? problemData?.problemName ?? problemData?.name ?? body.type ?? "Saved problem";
+  const sector = body.sector ?? problemData?.sector ?? body.type ?? "custom";
 
   if (!name || !sector || !problemData) {
     res.status(400).json({ error: "Required: name, sector, problemData." });
     return;
   }
 
-  const objectiveType = problemData.objectiveType ?? "maximize";
-  const status = result?.status ?? null;
-  const optimalValue = result?.optimalValue != null ? String(result.optimalValue) : null;
+  const objectiveType = body.objectiveType ?? problemData.objectiveType ?? "maximize";
+  const status = (result as Record<string, unknown> | null)?.status ?? body.status ?? null;
+  const optimalValue = (body.optimalValue ?? (result as Record<string, unknown> | null)?.optimalValue) != null
+    ? String(body.optimalValue ?? (result as Record<string, unknown> | null)?.optimalValue)
+    : null;
 
   try {
     const rows = await db
       .insert(savedProblemsTable)
-      .values({ name, sector, objectiveType, status, optimalValue, problemData, result: result ?? null })
+      .values({
+        name: String(name),
+        sector: String(sector),
+        objectiveType: String(objectiveType),
+        status: status == null ? null : String(status),
+        optimalValue,
+        problemData,
+        result: result ?? null,
+      })
       .returning();
 
     const r = rows[0];
+    await writeSharedHistoryRecord(buildSharedHistoryRecord(body));
     res.status(201).json({
       ...r,
       optimalValue: r.optimalValue != null ? parseFloat(r.optimalValue as string) : null,

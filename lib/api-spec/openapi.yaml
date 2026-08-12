@@ -15,6 +15,8 @@ tags:
     description: Saved problems management
   - name: templates
     description: Sector templates
+  - name: shared-history
+    description: Shared saved-result summaries across modules
 paths:
   /healthz:
     get:
@@ -176,6 +178,46 @@ paths:
                 $ref: "#/components/schemas/Template"
         "404":
           description: Not found
+
+  /shared-history:
+    get:
+      operationId: listSharedHistory
+      tags: [shared-history]
+      summary: List shared saved-result summaries
+      parameters:
+        - name: limit
+          in: query
+          schema:
+            type: integer
+            default: 100
+            minimum: 1
+            maximum: 100
+      responses:
+        "200":
+          description: Shared history records
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/SharedHistory"
+    post:
+      operationId: createSharedHistory
+      tags: [shared-history]
+      summary: Write a shared saved-result summary
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/SharedHistoryInput"
+      responses:
+        "201":
+          description: Shared history record created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SharedHistory"
 
 components:
   schemas:
@@ -442,6 +484,42 @@ components:
         - bySector
         - byStatus
         - recentProblems
+
+    SharedHistoryInput:
+      type: object
+      properties:
+        moduleName:
+          type: string
+        problemName:
+          type: string
+        keyResultValues:
+          type: object
+          additionalProperties: true
+      required:
+        - moduleName
+        - problemName
+        - keyResultValues
+
+    SharedHistory:
+      type: object
+      properties:
+        id:
+          type: integer
+        moduleName:
+          type: string
+        problemName:
+          type: string
+        keyResultValues:
+          type: object
+          additionalProperties: true
+        savedAt:
+          type: string
+      required:
+        - id
+        - moduleName
+        - problemName
+        - keyResultValues
+        - savedAt
 
     TemplateVariable:
       type: object
