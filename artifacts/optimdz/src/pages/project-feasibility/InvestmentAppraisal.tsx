@@ -5,6 +5,7 @@ import {
 } from "@/lib/investmentAppraisalAlgorithm";
 import type { InvestmentAppraisalInput, InvestmentAppraisalResult } from "@/lib/investmentAppraisalAlgorithm";
 import { InvestmentAppraisalReport } from "./InvestmentAppraisalReport";
+import { SimilarPastDecisions } from "@/components/SimilarPastDecisions";
 
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -853,6 +854,10 @@ export default function InvestmentAppraisal() {
             result={result}
             projectName={projectName}
             sector={selectedSector}
+          />
+
+          <SimilarPastDecisions
+            resultKey={`${result.input.initialInvestment}-${result.input.discountRate}-${result.input.duration}-${result.npv}`}
           />
         </div>
       )}
