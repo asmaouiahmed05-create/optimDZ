@@ -1,6 +1,7 @@
 import { useLanguage } from "@/lib/LanguageContext";
 import { Link } from "wouter";
 import { Calculator, Truck, Users, Network, BarChart3, Briefcase, Brain, ArrowRight, CheckCircle2, Sparkles, MessageSquareMore, Scale, Package, Factory } from "lucide-react";
+import { SharedHistoryPanel } from "@/components/SharedHistoryPanel";
 
 // ── Module definitions ────────────────────────────────────────────────────────
 interface Module {
@@ -255,6 +256,9 @@ export default function PlatformHome() {
           </Link>
         </section>
 
+        {/* ── Shared activity ──────────────────────────────────────────────── */}
+        <SharedHistoryPanel />
+
         {/* ── Modules ──────────────────────────────────────────────────────── */}
         <section className="space-y-6">
           <div>
@@ -358,7 +362,7 @@ export default function PlatformHome() {
 }
 
 // ── Platform Navbar ───────────────────────────────────────────────────────────
-function PlatformNav() {
+export function PlatformNav() {
   const { t, language, setLanguage } = useLanguage();
   const isAr = language === "ar";
 
@@ -392,6 +396,7 @@ function PlatformNav() {
             onClick={() => setLanguage(isAr ? "fr" : "ar")}
             className="text-sm font-bold font-mono border border-border rounded px-2.5 py-1 hover:bg-muted transition-colors"
             title={t("Changer la langue", "تغيير اللغة")}
+            data-testid="button-language-toggle"
           >
             {isAr ? "FR" : "AR"}
           </button>

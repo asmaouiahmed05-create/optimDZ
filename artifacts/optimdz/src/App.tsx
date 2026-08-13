@@ -14,6 +14,7 @@ import { TransportLayout } from "@/components/TransportLayout";
 import { AssignmentLayout } from "@/components/AssignmentLayout";
 
 import PlatformHome from "@/pages/PlatformHome";
+import Activity from "@/pages/Activity";
 import Home from "@/pages/Home";
 import History from "@/pages/History";
 import Solve from "@/pages/Solve";
@@ -66,6 +67,7 @@ function Router() {
     <Switch>
       {/* Platform landing — has its own nav, no Layout wrapper */}
       <Route path="/" component={PlatformHome} />
+      <Route path="/activity" component={Activity} />
 
       {/* All module routes share a catch-all route; layout is chosen by path prefix */}
       <Route>
