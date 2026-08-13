@@ -62,6 +62,17 @@ const MODULES: Module[] = [
     badge: { fr: "Disponible", ar: "متاح" },
   },
   {
+    id: "mst",
+    icon: Network,
+    nameFr: "Arbre Couvrant Minimal",
+    nameAr: "الشجرة الممتدة الصغرى",
+    descFr: "Construisez un réseau de coût minimal avec Kruskal et identifiez les connexions redondantes qui créent des cycles.",
+    descAr: "ابنِ شبكة بأقل تكلفة باستخدام كروسكال وحدد الوصلات الزائدة التي تكوّن دورات.",
+    href: "/industrial-management/mst",
+    active: true,
+    badge: { fr: "Nouveau", ar: "جديد" },
+  },
+  {
     id: "project-feasibility",
     icon: Briefcase,
     nameFr: "Faisabilité & Évaluation de Projet",

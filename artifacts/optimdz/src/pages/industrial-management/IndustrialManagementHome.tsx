@@ -5,6 +5,7 @@ import {
   ArrowRight, CheckCircle2, Factory,
   ClipboardList, CalendarRange, Gauge, ShieldCheck, Wrench,
   ShoppingBag, Leaf, Monitor, PencilRuler,
+  Network,
 } from "lucide-react";
 
 // ── Sector cards ──────────────────────────────────────────────────────────────
@@ -92,12 +93,23 @@ const TOOLS: Tool[] = [
     active: true,
     badge: { fr: "Disponible", ar: "متاح" },
   },
+  {
+    id: "mst",
+    icon: Network,
+    nameAr: "الشجرة الممتدة الصغرى",
+    nameFr: "Arbre Couvrant Minimal",
+    descAr: "ابنِ شبكة بأقل تكلفة باستخدام خوارزمية كروسكال وحدد الوصلات التي تكوّن دورات زائدة.",
+    descFr: "Construisez un réseau de coût minimal avec Kruskal et repérez les connexions redondantes.",
+    href: "/industrial-management/mst",
+    active: true,
+    badge: { fr: "Nouveau", ar: "جديد" },
+  },
 ];
 
 const MODULE_STATS = [
-  { valueAr: "٥", valueFr: "5", labelAr: "أدوات مخططة", labelFr: "Outils planifiés" },
-  { valueAr: "٥",  valueFr: "5",  labelAr: "أدوات متاحة الآن", labelFr: "Outils disponibles" },
-  { valueAr: "MRP · SPT · EDD · FIFO", valueFr: "MRP · SPT · EDD · FIFO", labelAr: "الخوارزميات المدعومة", labelFr: "Algorithmes supportés" },
+  { valueAr: "٦", valueFr: "6", labelAr: "أدوات مخططة", labelFr: "Outils planifiés" },
+  { valueAr: "٦",  valueFr: "6",  labelAr: "أدوات متاحة الآن", labelFr: "Outils disponibles" },
+  { valueAr: "MRP · SPT · EDD · FIFO · MST", valueFr: "MRP · SPT · EDD · FIFO · MST", labelAr: "الخوارزميات المدعومة", labelFr: "Algorithmes supportés" },
 ];
 
 // ── Component ─────────────────────────────────────────────────────────────────
