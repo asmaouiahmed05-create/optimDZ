@@ -1,6 +1,6 @@
 import { useLanguage } from "@/lib/LanguageContext";
 import { Link } from "wouter";
-import { Calculator, Truck, Users, Network, BarChart3, Briefcase, Brain, ArrowRight, CheckCircle2, Sparkles, MessageSquareMore, Scale, Package, Factory } from "lucide-react";
+import { Calculator, Truck, Users, Network, BarChart3, Briefcase, Brain, ArrowRight, CheckCircle2, Sparkles, MessageSquareMore, Scale, Package, Factory, Compass } from "lucide-react";
 import { SharedHistoryPanel } from "@/components/SharedHistoryPanel";
 
 // ── Module definitions ────────────────────────────────────────────────────────
@@ -69,6 +69,17 @@ const MODULES: Module[] = [
     descFr: "Construisez un réseau de coût minimal avec Kruskal et identifiez les connexions redondantes qui créent des cycles.",
     descAr: "ابنِ شبكة بأقل تكلفة باستخدام كروسكال وحدد الوصلات الزائدة التي تكوّن دورات.",
     href: "/industrial-management/mst",
+    active: true,
+    badge: { fr: "Nouveau", ar: "جديد" },
+  },
+  {
+    id: "swot-analysis",
+    icon: Compass,
+    nameFr: "Analyse stratégique SWOT / PESTEL",
+    nameAr: "التحليل الاستراتيجي SWOT / PESTEL",
+    descFr: "Analysez les forces, faiblesses, opportunités et menaces avec IFE/EFE, puis générez des stratégies TOWS adaptées à vos facteurs.",
+    descAr: "حلّل نقاط القوة والضعف والفرص والتهديدات باستخدام IFE/EFE، ثم أنشئ استراتيجيات TOWS مناسبة لعوامل مؤسستك.",
+    href: "/industrial-management/swot-analysis",
     active: true,
     badge: { fr: "Nouveau", ar: "جديد" },
   },

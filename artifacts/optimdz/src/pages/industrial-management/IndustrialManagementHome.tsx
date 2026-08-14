@@ -5,7 +5,7 @@ import {
   ArrowRight, CheckCircle2, Factory,
   ClipboardList, CalendarRange, Gauge, ShieldCheck, Wrench,
   ShoppingBag, Leaf, Monitor, PencilRuler,
-  Network,
+  Network, Compass,
 } from "lucide-react";
 
 // ── Sector cards ──────────────────────────────────────────────────────────────
@@ -104,12 +104,23 @@ const TOOLS: Tool[] = [
     active: true,
     badge: { fr: "Nouveau", ar: "جديد" },
   },
+  {
+    id: "swot-analysis",
+    icon: Compass,
+    nameAr: "التحليل الاستراتيجي SWOT / PESTEL",
+    nameFr: "Analyse stratégique SWOT / PESTEL",
+    descAr: "قيّم نقاط القوة والضعف والفرص والتهديدات بمصفوفتي IFE وEFE، ثم حوّل النتائج إلى توصيات TOWS عملية.",
+    descFr: "Évaluez les forces, faiblesses, opportunités et menaces avec les matrices IFE/EFE, puis obtenez des recommandations TOWS concrètes.",
+    href: "/industrial-management/swot-analysis",
+    active: true,
+    badge: { fr: "Nouveau", ar: "جديد" },
+  },
 ];
 
 const MODULE_STATS = [
-  { valueAr: "٦", valueFr: "6", labelAr: "أدوات مخططة", labelFr: "Outils planifiés" },
-  { valueAr: "٦",  valueFr: "6",  labelAr: "أدوات متاحة الآن", labelFr: "Outils disponibles" },
-  { valueAr: "MRP · SPT · EDD · FIFO · MST", valueFr: "MRP · SPT · EDD · FIFO · MST", labelAr: "الخوارزميات المدعومة", labelFr: "Algorithmes supportés" },
+  { valueAr: "٧", valueFr: "7", labelAr: "أدوات مخططة", labelFr: "Outils planifiés" },
+  { valueAr: "٧",  valueFr: "7",  labelAr: "أدوات متاحة الآن", labelFr: "Outils disponibles" },
+  { valueAr: "MRP · SPT · EDD · FIFO · MST · SWOT", valueFr: "MRP · SPT · EDD · FIFO · MST · SWOT", labelAr: "الخوارزميات المدعومة", labelFr: "Algorithmes supportés" },
 ];
 
 // ── Component ─────────────────────────────────────────────────────────────────
